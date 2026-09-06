@@ -3,12 +3,29 @@
 {$SITE_URL} {
 	encode zstd gzip
 
-	# Uploads: served straight from the content store, before the Indiekit
-	# media endpoint below can claim the prefix.
-	handle_path /media/* {
-		root * /srv/content/media
+	# Uploads: served from the content store when the file is there, otherwise
+	# from the built site (the theme's own sample media lives there), before
+	# the Indiekit media endpoint below can claim the prefix.
+	@upload {
+		path /media/*
+		file {
+			root /srv/content
+		}
+	}
+	handle @upload {
+		root * /srv/content
 		file_server
 		header Cache-Control "public, max-age=2592000, immutable"
+	}
+	@site_media {
+		path /media/*
+		file {
+			root /srv/site
+		}
+	}
+	handle @site_media {
+		root * /srv/site
+		file_server
 	}
 
 	# Indiekit: its endpoints and its admin interface. The site keeps /,

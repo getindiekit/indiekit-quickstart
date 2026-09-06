@@ -39,7 +39,7 @@ check("compose config resolves with the example env", () => {
 
 check("Caddyfile serves uploads before proxying the media endpoint, and covers Indiekit's paths", () => {
   const caddy = readFileSync("Caddyfile", "utf8");
-  assert.ok(caddy.indexOf("handle_path /media/*") < caddy.indexOf("reverse_proxy indiekit:3000"), "static uploads must come before the proxy");
+  assert.ok(caddy.indexOf("handle @upload") < caddy.indexOf("handle @site_media") && caddy.indexOf("handle @site_media") < caddy.indexOf("reverse_proxy indiekit:3000"), "uploads, then the built site's media, must come before the proxy");
   for (const p of ["/micropub*", "/auth*", "/media*", "/files*", "/image*", "/posts*", "/share*", "/syndicate*", "/webmentions*", "/session*", "/status*", "/assets*", "/id", "/plugins*"]) {
     assert.ok(caddy.includes(p), `Caddyfile does not route ${p}`);
   }
