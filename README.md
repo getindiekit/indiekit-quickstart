@@ -46,8 +46,9 @@ Docker host.
    docker compose up -d indiekit
    ```
 
-   Sign in at `SITE_URL/session/login`, post a note, and see it on your
-   homepage.
+   Open `SITE_URL/posts`: Indiekit asks you to sign in and brings you back
+   there. Post a note and see it on your homepage. (Indiekit's own front page
+   is `/`, which here is your site, so `/posts` and `/files` are the way in.)
 
 ## Before the image is published
 
