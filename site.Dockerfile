@@ -13,5 +13,11 @@ RUN npm install --no-audit --no-fund && npm cache clean --force
 COPY site/ ./
 COPY site.entrypoint.sh /usr/local/bin/site-entrypoint
 RUN chmod +x /usr/local/bin/site-entrypoint && chown -R node:node /site
+# The container runs as whatever uid compose gives it (UID_GID), which is not
+# the image's node user, so the two places Eleventy writes are made
+# world-writable: the build output (a named volume, seeded from this
+# directory mode included, and only ever mounted read-only elsewhere) and
+# Eleventy's image cache.
+RUN mkdir -p /site/_site /site/.cache && chmod 1777 /site/_site /site/.cache
 USER node
 ENTRYPOINT ["site-entrypoint"]

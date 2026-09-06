@@ -34,7 +34,16 @@ services:
     restart: unless-stopped
     user: "${UID_GID:-1000:1000}"
     volumes:
-      - ./content:/site/content
+      # The theme's content/ is both its Eleventy source and its post store,
+      # so the store is mounted one post directory at a time: the theme's own
+      # templates stay, your posts and uploads come from ./content.
+      - ./content/articles:/site/content/articles
+      - ./content/bookmarks:/site/content/bookmarks
+      - ./content/likes:/site/content/likes
+      - ./content/notes:/site/content/notes
+      - ./content/photos:/site/content/photos
+      - ./content/replies:/site/content/replies
+      - ./content/media:/site/content/media
       - ./site.json:/config/site.json:ro
       - built:/site/_site
     environment:

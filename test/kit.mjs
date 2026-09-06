@@ -26,7 +26,15 @@ check("compose config resolves with the example env", () => {
   const env = Object.fromEntries(readFileSync(".env.example", "utf8").split("\n").filter((l) => /^[A-Z_]+=/.test(l)).map((l) => l.split(/=(.*)/s).slice(0, 2)));
   const out = execFileSync("docker", ["compose", "--env-file", "/dev/null", "-f", "compose.yml", "config"], { env: { ...process.env, ...env, SECRET: "x" }, stdio: "pipe" }).toString();
   for (const svc of ["indiekit:", "mongo:", "site:", "caddy:"]) assert.ok(out.includes(svc), `${svc} missing`);
-  assert.ok(/user: "?1000:1000/.test(out), "containers do not run as UID_GID");
+  assert.equal((out.match(/user: "?1000:1000/g) || []).length, 2, "both writing containers (indiekit, site) must run as UID_GID");
+  // The theme's content/ is its Eleventy source as well as the store, so the
+  // site container must mount the store one post directory at a time, never
+  // the whole directory (that would hide the theme's templates).
+  for (const dir of ["articles", "bookmarks", "likes", "notes", "photos", "replies", "media"]) {
+    assert.ok(out.includes(`target: /site/content/${dir}`), `site does not mount ./content/${dir}`);
+    assert.ok(existsSync(`content/${dir}/.gitkeep`), `content/${dir}/.gitkeep missing: the bind mount would be created root-owned`);
+  }
+  assert.ok(!/target: \/site\/content\n/.test(out), "site mounts the whole content/ directory over the theme's source");
 });
 
 check("Caddyfile serves uploads before proxying the media endpoint, and covers Indiekit's paths", () => {

@@ -1,3 +1,13 @@
 .env
+# Your posts and uploads are yours, not the kit's. The empty directories are
+# kept so the bind mounts exist and belong to you, not to root.
 content/*
-!content/.gitkeep
+!content/articles/
+!content/bookmarks/
+!content/likes/
+!content/notes/
+!content/photos/
+!content/replies/
+!content/media/
+content/*/*
+!content/*/.gitkeep

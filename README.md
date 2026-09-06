@@ -13,7 +13,6 @@ Docker host.
    ```sh
    git clone --recurse-submodules https://github.com/getindiekit/indiekit-quickstart
    cd indiekit-quickstart
-   mkdir content
    ```
 
 2. Edit `site.json`: your site's name, description, timezone and author.
@@ -34,7 +33,8 @@ Docker host.
    docker compose up -d
    ```
 
-   Then open `SITE_URL` in a browser.
+   Then open `SITE_URL` in a browser. The first build of the site takes a few
+   seconds after the containers start; if you see a 404, wait and refresh.
 
 5. Set your password and post something:
 
@@ -77,7 +77,9 @@ docker compose up -d --build
 
 ## Where things live
 
-- `content/` is yours: your posts and uploads. Back it up.
+- `content/` is yours: one directory per post type (`articles`, `bookmarks`,
+  `likes`, `notes`, `photos`, `replies`) and `media` for uploads. Indiekit
+  writes there; the site is built from there. Back it up.
 - `site/` is the theme (a git submodule). Customise your site through
   `site.json` here, or through the theme's own `_data/site.json` keys — see
   the [theme README](https://github.com/getindiekit/indiekit-theme-eleventy#readme)

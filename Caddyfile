@@ -13,6 +13,20 @@
 
 	# Indiekit: its endpoints and its admin interface. The site keeps /,
 	# robots.txt, the feeds and its own assets.
+	#
+	# Indiekit redirects any request whose X-Forwarded-Proto is not https. On a
+	# plain-HTTP local try-out that would redirect forever, so the header is
+	# dropped when the address scheme is http; nothing else in Indiekit reads it.
+	# Over HTTPS it is passed through and the redirect never fires.
+	@indiekit_plain {
+		path /micropub* /auth* /media* /files* /image* /posts* /share* /syndicate* /webmentions* /session* /status* /assets* /id /plugins* /feed.jf2
+		expression {scheme} == "http"
+	}
+	handle @indiekit_plain {
+		reverse_proxy indiekit:3000 {
+			header_up -X-Forwarded-Proto
+		}
+	}
 	@indiekit path /micropub* /auth* /media* /files* /image* /posts* /share* /syndicate* /webmentions* /session* /status* /assets* /id /plugins* /feed.jf2
 	handle @indiekit {
 		reverse_proxy indiekit:3000
