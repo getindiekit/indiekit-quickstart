@@ -23,9 +23,10 @@ Docker host.
    cp .env.example .env
    ```
 
-   Set `SITE_URL` (your domain, e.g. `https://example.com`), `SECRET` (any
-   long random string), and `UID_GID` (`id -u`, `id -g` — so files written
-   under `content/` belong to you, not root).
+   Set `SITE_URL` (your domain, e.g. `https://example.com`), `SITE_HOST` (the
+   same domain without the scheme, e.g. `example.com`), `SECRET` (any long
+   random string), and `UID_GID` (`id -u`, `id -g` — so files written under
+   `content/` belong to you, not root).
 
 4. Start the stack and open your site:
 
@@ -91,10 +92,13 @@ docker compose up -d --build
 ## Local try-out
 
 To run this on your own machine with no domain and no certificate, set
-`SITE_URL=http://localhost` in `.env`. If port 80 or 443 is already taken,
-set `HTTP_PORT` / `HTTPS_PORT` in `.env` to something free and put that port
-in `SITE_URL` too (e.g. `SITE_URL=http://localhost:8088`,
-`HTTP_PORT=8088`).
+`SITE_URL=http://quickstart.localhost` and `SITE_HOST=quickstart.localhost`
+in `.env`. Any name ending in `.localhost` resolves to your machine in
+browsers and on most systems, and unlike plain `localhost` it can also be
+reached from inside the Indiekit container, which sign-in needs. If port 80
+or 443 is already taken, set `HTTP_PORT` / `HTTPS_PORT` in `.env` to
+something free and put that port in `SITE_URL` too
+(e.g. `SITE_URL=http://quickstart.localhost:8088`, `HTTP_PORT=8088`).
 
 ## Images
 

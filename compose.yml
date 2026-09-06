@@ -11,6 +11,12 @@ services:
       MONGO_URL: mongodb://mongo:27017/indiekit
       SECRET: ${SECRET}
       PASSWORD_SECRET: ${PASSWORD_SECRET:-}
+    # Sign-in makes the server fetch its own public address. From inside the
+    # container that address must reach this machine's Caddy, not the
+    # container itself (localhost) and not depend on the network hairpinning
+    # back in; mapping the host name to the Docker host does both.
+    extra_hosts:
+      - "${SITE_HOST}:host-gateway"
     depends_on:
       mongo:
         condition: service_healthy
