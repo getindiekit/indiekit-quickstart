@@ -1,0 +1,9 @@
+# Only site/ and site.entrypoint.sh go into the site image. Everything else
+# stays out of the build context: secrets, your posts, and anything a local
+# npm install or Eleventy run left inside the theme checkout.
+*
+!site
+!site.entrypoint.sh
+site/node_modules
+site/_site
+site/.cache

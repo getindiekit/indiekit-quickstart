@@ -102,10 +102,11 @@ something free and put that port in `SITE_URL` too
 
 ## Images
 
-Three images make up the stack, alongside stock `mongo:8` and `caddy:2-alpine`:
+The stack runs four images. Two are stock, two are Indiekit's:
 
 | Image | Size |
 |---|---|
-| `ghcr.io/getindiekit/indiekit:beta` | not yet published |
-| `site` (built from `site.Dockerfile`) | Measured in the proof: see below. |
+| `ghcr.io/getindiekit/indiekit:beta` | 718 MB when built locally from the pull request that adds it; not yet published |
+| `site` (built from `site.Dockerfile`) | 488 MB, of which the `node:24-alpine` base is 234MB and the theme's dependencies 175 MB |
+| `mongo:8` | stock image |
 | `caddy:2-alpine` | stock image |
