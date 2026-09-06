@@ -1,0 +1,31 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - run: node test/kit.mjs
+
+      - run: docker build -f site.Dockerfile -t site:check .
+
+      - name: check site image is under 400 MB
+        run: |
+          size=$(docker image inspect site:check --format '{{.Size}}')
+          echo "site:check image size: ${size} bytes"
+          test "$size" -lt $((400 * 1000 * 1000))
+
+      - name: build the site inside the image
+        run: |
+          docker run --rm -e SITE_URL=http://localhost -v "$PWD/site.json:/config/site.json:ro" site:check sh -c 'printf "{\"url\":\"http://localhost\",\"indiekit\":\"http://localhost\"}" > /tmp/u.json; SITE_FIXTURE=/config/site.json,/tmp/u.json NPM_DOWNLOADS_OFFLINE=1 npx @11ty/eleventy --quiet --output=/tmp/out && test -f /tmp/out/index.html'

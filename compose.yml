@@ -1,0 +1,70 @@
+services:
+  indiekit:
+    image: ghcr.io/getindiekit/indiekit:beta
+    restart: unless-stopped
+    user: "${UID_GID:-1000:1000}"
+    volumes:
+      - ./indiekit.config.js:/app/indiekit.config.js:ro
+      - ./content:/app/content
+    environment:
+      PUBLICATION_URL: ${SITE_URL}
+      MONGO_URL: mongodb://mongo:27017/indiekit
+      SECRET: ${SECRET}
+      PASSWORD_SECRET: ${PASSWORD_SECRET:-}
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  mongo:
+    image: mongo:8
+    restart: unless-stopped
+    volumes:
+      - mongo:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  site:
+    build:
+      context: .
+      dockerfile: site.Dockerfile
+    restart: unless-stopped
+    user: "${UID_GID:-1000:1000}"
+    volumes:
+      - ./content:/site/content
+      - ./site.json:/config/site.json:ro
+      - built:/site/_site
+    environment:
+      SITE_URL: ${SITE_URL}
+      THEME_SAMPLE_POSTS: "0"
+      NPM_DOWNLOADS_OFFLINE: "1"
+      SPEEDLIFY_OFFLINE: "1"
+      NODE_ENV: production
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - built:/srv/site:ro
+      - ./content:/srv/content:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      SITE_URL: ${SITE_URL}
+    depends_on:
+      - indiekit
+      - site
+
+volumes:
+  mongo:
+  built:
+  caddy_data:
+  caddy_config:

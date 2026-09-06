@@ -1,0 +1,34 @@
+# One site address drives everything: https://your.domain gets automatic
+# HTTPS; http://localhost is plain HTTP for a local try-out.
+{$SITE_URL} {
+	encode zstd gzip
+
+	# Uploads: served straight from the content store, before the Indiekit
+	# media endpoint below can claim the prefix.
+	handle_path /media/* {
+		root * /srv/content/media
+		file_server
+		header Cache-Control "public, max-age=2592000, immutable"
+	}
+
+	# Indiekit: its endpoints and its admin interface. The site keeps /,
+	# robots.txt, the feeds and its own assets.
+	@indiekit path /micropub* /auth* /media* /files* /image* /posts* /share* /syndicate* /webmentions* /session* /status* /assets* /id /plugins* /feed.jf2
+	handle @indiekit {
+		reverse_proxy indiekit:3000
+	}
+
+	# The site.
+	handle {
+		root * /srv/site
+		try_files {path} {path}/ {path}.html
+		file_server
+	}
+
+	handle_errors {
+		@notfound expression {http.error.status_code} == 404
+		rewrite @notfound /404.html
+		root * /srv/site
+		file_server
+	}
+}
