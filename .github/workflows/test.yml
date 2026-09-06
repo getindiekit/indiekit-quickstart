@@ -7,6 +7,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -27,5 +28,7 @@ jobs:
           test "$size" -lt $((400 * 1000 * 1000))
 
       - name: build the site inside the image
+        # --entrypoint: the image's entrypoint is the watcher, which would
+        # build once and then wait on inotifywait forever, ignoring the command.
         run: |
-          docker run --rm -e SITE_URL=http://localhost -v "$PWD/site.json:/config/site.json:ro" site:check sh -c 'printf "{\"url\":\"http://localhost\",\"indiekit\":\"http://localhost\"}" > /tmp/u.json; SITE_FIXTURE=/config/site.json,/tmp/u.json NPM_DOWNLOADS_OFFLINE=1 npx @11ty/eleventy --quiet --output=/tmp/out && test -f /tmp/out/index.html'
+          docker run --rm --entrypoint sh -e SITE_URL=http://localhost -e SPEEDLIFY_OFFLINE=1 -v "$PWD/site.json:/config/site.json:ro" site:check -c 'printf "{\"url\":\"http://localhost\",\"indiekit\":\"http://localhost\"}" > /tmp/u.json; SITE_FIXTURE=/config/site.json,/tmp/u.json NPM_DOWNLOADS_OFFLINE=1 npx @11ty/eleventy --quiet --output=/tmp/out && test -f /tmp/out/index.html'
