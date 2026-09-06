@@ -55,6 +55,7 @@ services:
     environment:
       SITE_URL: ${SITE_URL}
       THEME_SAMPLE_POSTS: "0"
+      DEMO: ${DEMO:-0}
       NPM_DOWNLOADS_OFFLINE: "1"
       SPEEDLIFY_OFFLINE: "1"
       NODE_ENV: production

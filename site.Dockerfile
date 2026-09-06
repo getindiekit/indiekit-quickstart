@@ -15,6 +15,9 @@ WORKDIR /site
 COPY --chown=node:node site/package.json ./
 RUN npm install --no-audit --no-fund && npm cache clean --force
 COPY --chown=node:node site/ ./
+# A copy of the theme's sample posts, taken before the store is bind-mounted
+# over these directories at run time: DEMO=1 seeds the store from it.
+RUN mkdir /site/.demo && for d in articles bookmarks likes notes photos replies media; do mkdir -p "content/$d" && cp -a "content/$d" /site/.demo/; done
 COPY --chmod=755 site.entrypoint.sh /usr/local/bin/site-entrypoint
 # The container runs as whatever uid compose gives it (UID_GID), which is not
 # the image's node user, so the two places Eleventy writes are made

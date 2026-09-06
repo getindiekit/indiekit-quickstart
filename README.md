@@ -100,6 +100,18 @@ or 443 is already taken, set `HTTP_PORT` / `HTTPS_PORT` in `.env` to
 something free and put that port in `SITE_URL` too
 (e.g. `SITE_URL=http://quickstart.localhost:8088`, `HTTP_PORT=8088`).
 
+## Demo
+
+To see the theme with content before you have any, set `DEMO=1` in `.env`
+(with the local try-out values above) and start the stack. The theme's
+sample posts are copied into `content/`, the site builds with the theme's
+demo identity and sample webmentions, and `site.json` is left unread. Posting
+still works: finish step 5 and your note appears next to the samples.
+
+Back to your own site: set `DEMO=0`, delete `content/*/fixture-*`, and
+restart the `site` service. With `DEMO=0` the samples are hidden even if
+the files are still there.
+
 ## Images
 
 The stack runs four images. Two are stock, two are Indiekit's:

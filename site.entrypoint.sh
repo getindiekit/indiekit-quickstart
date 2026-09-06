@@ -7,8 +7,39 @@ set -eu
 printf '{"url":"%s","indiekit":"%s"}\n' "$SITE_URL" "$SITE_URL" > /tmp/site.url.json
 export SITE_FIXTURE="/config/site.json,/tmp/site.url.json"
 
+# DEMO=1: a showcase anyone can boot. The theme's sample posts are seeded
+# into the store from the copy the image keeps (never overwriting a file
+# that is already there), sample posts stop being ignored, and the build
+# uses the theme's demo identity and demo webmentions instead of site.json.
+if [ "${DEMO:-0}" = "1" ]; then
+	# File by file: busybox cp -n given a directory skips it whole once the
+	# destination directory exists, which every store directory does.
+	for d in articles bookmarks likes notes photos replies media; do
+		for f in "/site/.demo/$d"/*; do
+			[ -e "$f" ] || continue
+			[ -e "/site/content/$d/${f##*/}" ] || cp -a "$f" "/site/content/$d/"
+		done
+	done
+	unset THEME_SAMPLE_POSTS
+	export WEBMENTIONS_FIXTURE=/site/test/fixtures/webmentions-demo.json
+	export SITE_FIXTURE="/site/test/fixtures/site-demo.json,/tmp/site.url.json"
+	echo "site: demo mode, sample posts seeded into content/"
+fi
+
+# Built into a staging directory inside the output volume, then swapped in
+# with one delete and one move, so the page of a deleted post (or of a demo
+# sample after DEMO=0) does not linger: Eleventy never removes output files
+# it no longer writes. The swap is a few milliseconds on the same filesystem.
+OUT=/site/_site
 build() {
-	npx @11ty/eleventy --quiet --output=/site/_site && echo "site: built $(date -u +%FT%TZ)"
+	rm -rf "$OUT/.next"
+	npx @11ty/eleventy --quiet --output="$OUT/.next" || return 1
+	find "$OUT" -mindepth 1 -maxdepth 1 ! -name .next -exec rm -rf {} +
+	for f in "$OUT/.next"/* "$OUT/.next"/.[!.]*; do
+		[ -e "$f" ] && mv "$f" "$OUT/"
+	done
+	rmdir "$OUT/.next"
+	echo "site: built $(date -u +%FT%TZ)"
 }
 
 # The first build must succeed: a broken site should fail loudly at start.
