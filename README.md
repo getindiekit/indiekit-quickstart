@@ -29,8 +29,18 @@ Docker host.
    `--force`.
 
    Open `SITE_URL` for your site, and `SITE_URL/posts` to write. To set it up
-   without a terminal, set `INDIEKIT_PASSWORD` and run `./bootstrap` from a
-   script.
+   without a terminal, set `INDIEKIT_PASSWORD` (and optionally
+   `INDIEKIT_SITE_URL` and `INDIEKIT_AUTHOR_NAME`) and run `./bootstrap` from
+   a script. Passing `INDIEKIT_PASSWORD` inline on the command line puts it in
+   your shell history — export it in the script instead.
+
+   Until `ghcr.io/getindiekit/indiekit:beta` is published (see below),
+   `./bootstrap` needs to know to use the locally-built image too:
+
+   ```sh
+   COMPOSE_FILE=compose.yml:compose.local.yml ./bootstrap
+   docker compose up -d
+   ```
 
 ## Before the image is published
 
