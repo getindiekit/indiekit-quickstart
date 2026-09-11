@@ -311,5 +311,33 @@ check("INDIEKIT_AUTHOR_NAME and INDIEKIT_SITE_URL override the unattended identi
   }
 });
 
+check("Ctrl-D after the first prompt is handled the same way everywhere: no stack trace, ever", () => {
+  // rl.question() rejects the *pending* question with AbortError on Ctrl-D,
+  // and also closes rl — every later rl.question() then rejects with
+  // ERR_USE_AFTER_CLOSE. That only shows up on a real TTY (a piped stdin
+  // never reaches rawQuestion at all, see minimalEnv's neighbours above), so
+  // this drives bootstrap over a pty. 'url' proves the first prompt's EOF
+  // does not break the next one; 'name' and 'note' are prompts *after* the
+  // first, which is the case no other check exercises.
+  const crashMarkers = /ERR_USE_AFTER_CLOSE|at \[kQuestion\]|Node\.js v\d/;
+
+  for (const breakAt of ["url", "name", "note"]) {
+    const dir = freshClone();
+    try {
+      const driver = spawnSync("python3", [join(process.cwd(), "test", "pty-eof.py"), dir, breakAt], {
+        encoding: "utf8",
+        env: minimalEnv({ COMPOSE_FILE: "compose.yml:compose.local.yml" }),
+      });
+      assert.equal(driver.status, 0, `pty-eof.py driver failed for '${breakAt}':\n${driver.stdout}${driver.stderr}`);
+
+      const { status, output } = JSON.parse(driver.stdout);
+      assert.doesNotMatch(output, crashMarkers, `EOF at '${breakAt}' printed a stack trace:\n${output}`);
+      assert.notEqual(status, null, `bootstrap never exited after EOF at '${breakAt}'`);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
 console.log(`\n${failed === 0 ? "all checks passed" : failed + " failed"}`);
 process.exit(failed ? 1 : 0);

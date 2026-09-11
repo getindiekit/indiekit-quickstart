@@ -39,7 +39,7 @@ Docker host.
 
    ```sh
    COMPOSE_FILE=compose.yml:compose.local.yml ./bootstrap
-   docker compose up -d
+   COMPOSE_FILE=compose.yml:compose.local.yml docker compose up -d
    ```
 
 ## Before the image is published

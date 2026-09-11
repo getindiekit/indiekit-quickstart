@@ -37,18 +37,22 @@ try {
 const rl = createInterface({ input: process.stdin, output: process.stdout });
 
 // Every prompt goes through rawQuestion, so there is exactly one place that
-// turns Ctrl-D into something other than an uncaught AbortError and a raw
-// stack trace: on a real TTY, reaching EOF mid-prompt rejects rl.question()
-// with one. (A non-TTY stdin behaves differently again — it never resolves
-// at all, which is why ask() and askList() below never call this without
-// checking isTTY first.)
+// turns Ctrl-D into something other than an uncaught error and a raw stack
+// trace: on a real TTY, reaching EOF mid-prompt rejects the *pending*
+// rl.question() with AbortError, and also closes rl — every later
+// rl.question() then rejects with ERR_USE_AFTER_CLOSE. Both map to the same
+// Eof, so Ctrl-D anywhere behaves the same way at every later prompt: ask()
+// falls back to its default, askList() returns whatever it already has, and
+// readPassword() gives up cleanly. (A non-TTY stdin behaves differently
+// again — it never resolves at all, which is why ask() and askList() below
+// never call this without checking isTTY first.)
 class Eof extends Error {}
 
 const rawQuestion = async (prompt) => {
   try {
     return await rl.question(prompt);
   } catch (error) {
-    if (error.name === "AbortError") throw new Eof();
+    if (error.name === "AbortError" || error.code === "ERR_USE_AFTER_CLOSE") throw new Eof();
     throw error;
   }
 };
@@ -195,8 +199,9 @@ const askIdentity = siteUntouched || force;
 
 let identity;
 if (askIdentity) {
-  const name = await ask("Site name", "My site");
-  const description = await ask("Description", JSON.parse(siteTemplate).description);
+  const template = JSON.parse(siteTemplate);
+  const name = await ask("Site name", template.name);
+  const description = await ask("Description", template.description);
   const timezone = await ask("Timezone", Intl.DateTimeFormat().resolvedOptions().timeZone);
   const authorName = await ask("Your name", process.env.INDIEKIT_AUTHOR_NAME || "");
   const authorUrl = await ask("Your URL", siteUrl);
@@ -204,7 +209,7 @@ if (askIdentity) {
   const authorMe = await askList("rel=me links");
   identity = { name, description, timezone, authorName, authorUrl, authorNote, authorMe };
 
-  if (!authorName && !process.stdin.isTTY) {
+  if (!authorName) {
     console.error(
       "Warning: no author name set, so the site will publish with no discoverable\n" +
         "identity (h-card, rel=author and the author meta tag all come from\n" +
