@@ -84,14 +84,18 @@ docker compose up -d --build
 
 ## Local try-out
 
-To run this on your own machine with no domain and no certificate, set
-`SITE_URL=http://quickstart.localhost` and `SITE_HOST=quickstart.localhost`
-in `.env`. Any name ending in `.localhost` resolves to your machine in
-browsers and on most systems, and unlike plain `localhost` it can also be
-reached from inside the Indiekit container, which sign-in needs. If port 80
-or 443 is already taken, set `HTTP_PORT` / `HTTPS_PORT` in `.env` to
-something free and put that port in `SITE_URL` too
-(e.g. `SITE_URL=http://quickstart.localhost:8088`, `HTTP_PORT=8088`).
+To run this on your own machine with no domain and no certificate, accept
+`bootstrap`'s default site URL — `http://quickstart.localhost` — by pressing
+Enter at the first question. It derives `SITE_HOST` from whatever you answer,
+so the two can never disagree.
+
+Any name ending in `.localhost` resolves to your machine in browsers and on
+most systems, and unlike plain `localhost` it can also be reached from inside
+the Indiekit container, which sign-in needs.
+
+If port 80 or 443 is already taken, set `HTTP_PORT` / `HTTPS_PORT` in `.env`
+after bootstrapping, and give `bootstrap` a site URL carrying the same port
+(e.g. `http://quickstart.localhost:8088` with `HTTP_PORT=8088`).
 
 ## Demo
 
@@ -105,6 +109,51 @@ samples.
 Back to your own site: set `DEMO=0`, delete `content/*/fixture-*`, and
 restart the `site` service. With `DEMO=0` the samples are hidden even if
 the files are still there.
+
+## Development
+
+### Running the tests
+
+```sh
+COMPOSE_FILE=compose.yml:compose.local.yml node test/kit.mjs
+```
+
+There is no `package.json` and nothing to install: the checks use Node's
+built-ins only, so Docker stays the single prerequisite.
+
+`COMPOSE_FILE` is needed until `ghcr.io/getindiekit/indiekit:beta` is
+published. Two checks start a real container — one hashes a password and
+verifies the hash, the other runs `bootstrap` in a fresh clone — so build
+`indiekit:local` first, as "Before the image is published" describes. Without
+it those checks fail on the image, not on your change.
+
+The suite is idempotent: run it twice in a row and `git status` should be
+clean both times. If it is not, something wrote into the working tree that
+should have used a temporary directory.
+
+### How `bootstrap` is put together
+
+`bootstrap` is the command; `bootstrap.lib.mjs` holds the parts with no
+input, output or Docker in them — generating the secret, deriving the host
+from the URL, rendering `.env` and `site.json`. That split is what lets the
+checks assert them directly, without a terminal or a container. Logic worth
+testing belongs in the library; prompts, files and subprocesses belong in the
+command.
+
+Every prompt goes through the `ask` and `askList` helpers. They own two things
+that are easy to get wrong separately: falling back to the default when there
+is no terminal, and turning Ctrl-D into a clean exit rather than a stack
+trace. Add a prompt by calling them — a bare `rl.question` reintroduces both
+bugs.
+
+### `site.example.json`
+
+The pristine copy of `site.json`, and **the baseline `bootstrap` compares
+against** to decide whether you have customised your identity. It is not a
+file to edit. If it drifts from the shipped `site.json`, every fresh clone
+looks "already edited", `bootstrap` declines to write identity, and the site
+publishes with no h-card — silently. Change `site.json` and `site.example.json`
+together, or not at all.
 
 ## Images
 
