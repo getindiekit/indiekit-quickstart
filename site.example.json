@@ -1,0 +1,11 @@
+{
+  "name": "My site",
+  "description": "An IndieWeb site, published with Indiekit.",
+  "timezone": "UTC",
+  "author": {
+    "name": "",
+    "url": "",
+    "note": "",
+    "me": []
+  }
+}

@@ -51,7 +51,7 @@ check("Caddyfile validates", () => {
   execFileSync("docker", ["run", "--rm", "-v", `${process.cwd()}/Caddyfile:/etc/caddy/Caddyfile:ro`, "-e", "SITE_URL=http://localhost", "caddy:2-alpine", "caddy", "validate", "--config", "/etc/caddy/Caddyfile"], { stdio: "pipe" });
 });
 
-check("the README's five steps name only files that exist", () => {
+check("the README's two steps name only files that exist", () => {
   const readme = readFileSync("README.md", "utf8");
   for (const f of ["site.json", ".env.example", "compose.local.yml"]) assert.ok(readme.includes(f) && existsSync(f), `${f} named and present`);
 });
@@ -139,6 +139,10 @@ check("bootstrap is executable and refuses to clobber an existing .env", () => {
 check("the hash bootstrap writes verifies against the password", () => {
   // End to end: a hash of the right shape that fails bcrypt.compare would
   // strand a newcomer at the sign-in screen with nothing to debug.
+  // compose.yml interpolates ${SITE_HOST} etc. to parse at all, even for
+  // --no-deps on an unrelated service — supply them explicitly so this check
+  // does not depend on a .env file already sitting in this working tree.
+  const composeEnv = Object.fromEntries(readFileSync(".env.example", "utf8").split("\n").filter((l) => /^[A-Z_]+=/.test(l)).map((l) => l.split(/=(.*)/s).slice(0, 2)));
   const password = "correct horse battery";
   // Password goes on stdin, not argv — /proc/<pid>/cmdline is world-readable.
   const hash = execFileSync(
@@ -149,7 +153,7 @@ process.stdin.on("data", (c) => (d += c));
 process.stdin.on("end", () =>
   import("bcrypt").then((m) => m.default.hash(d, 10)).then((h) => process.stdout.write(h)),
 );`],
-    { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], input: password },
+    { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], input: password, env: { ...process.env, ...composeEnv } },
   ).trim();
 
   assert.match(hash, /^\$2[aby]\$/, "not a bcrypt hash");
@@ -165,10 +169,33 @@ process.stdin.on("end", () =>
   import("bcrypt").then((m) => m.default.compare(d, process.argv[1])).then((r) => process.stdout.write(String(r))),
 );`,
      "--", hash],
-    { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], input: password },
+    { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], input: password, env: { ...process.env, ...composeEnv } },
   ).trim();
 
   assert.equal(ok, "true", "the hash does not verify against its own password");
+});
+
+check("bootstrap leaves an edited site.json alone", () => {
+  const saved = readFileSync("site.json", "utf8");
+  writeFileSync("site.json", JSON.stringify({ name: "Edited by hand" }, undefined, 2));
+
+  let output = "";
+  try {
+    output = execFileSync("./bootstrap", {
+      encoding: "utf8",
+      stdio: "pipe",
+      input: "",
+      env: { ...process.env, INDIEKIT_PASSWORD: "abcdefgh" },
+    });
+  } catch (error) {
+    output = `${error.stdout ?? ""}${error.stderr ?? ""}`;
+  }
+
+  const after = JSON.parse(readFileSync("site.json", "utf8"));
+  writeFileSync("site.json", saved);
+
+  assert.equal(after.name, "Edited by hand", "bootstrap overwrote an edited site.json");
+  assert.match(output, /site\.json/, "bootstrap did not say it was leaving site.json alone");
 });
 
 check("bootstrap succeeds on a fresh clone, with no .env yet to supply compose.yml's interpolated variables", () => {

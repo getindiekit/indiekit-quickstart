@@ -4,7 +4,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
 import process from "node:process";
 
-import { deriveSiteHost, generateSecret, renderEnv } from "./bootstrap.lib.mjs";
+import { deriveSiteHost, generateSecret, renderEnv, renderSiteJson } from "./bootstrap.lib.mjs";
 
 const force = process.argv.includes("--force");
 
@@ -129,4 +129,45 @@ writeFileSync(
 );
 
 console.log("Wrote .env");
+
+// Identity: the h-card, rel="author" and the author meta tag all come from
+// here. Left at the template's blanks, the site publishes with no
+// discoverable identity at all.
+const siteTemplate = readFileSync("site.json", "utf8");
+const untouched = siteTemplate === readFileSync("site.example.json", "utf8");
+
+if (!untouched && !force) {
+  console.log("site.json has been edited; leaving it alone.");
+} else {
+  const name = await ask("Site name", "My site");
+  const description = await ask("Description", JSON.parse(siteTemplate).description);
+  const timezone = await ask("Timezone", Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const authorName = await ask("Your name", "");
+  const authorUrl = await ask("Your URL", siteUrl);
+  const authorNote = await ask("A line about you (optional)", "");
+
+  const authorMe = [];
+  console.log("  rel=me links, one per line, blank to finish:");
+  for (;;) {
+    const link = (await rl.question("  ")).trim();
+    if (link === "") break;
+    authorMe.push(link);
+  }
+
+  writeFileSync(
+    "site.json",
+    renderSiteJson(siteTemplate, {
+      name,
+      description,
+      timezone,
+      authorName,
+      authorUrl,
+      authorNote,
+      authorMe,
+    }),
+  );
+
+  console.log("Wrote site.json");
+}
+
 rl.close();

@@ -1,54 +1,36 @@
 # indiekit-quickstart
 
-Clone this repo, edit two files, run `docker compose up`, set a password, and
-you have an IndieWeb site running the
+Clone this repo, run `./bootstrap` and `docker compose up`, and you have an
+IndieWeb site running the
 [Indiekit reference Eleventy theme](https://github.com/getindiekit/indiekit-theme-eleventy)
 with [Indiekit](https://getindiekit.com/) behind it, over HTTPS, on any
 Docker host.
 
-## Five steps
+## Two steps
 
-1. Clone with the theme submodule and make somewhere for your posts to live:
+1. Clone with the theme submodule:
 
    ```sh
    git clone --recurse-submodules https://github.com/getindiekit/indiekit-quickstart
    cd indiekit-quickstart
    ```
 
-2. Edit `site.json`: your site's name, description, timezone and author.
-
-3. Copy the env file and fill it in:
+2. Answer a few questions, then start:
 
    ```sh
-   cp .env.example .env
-   ```
-
-   Set `SITE_URL` (your domain, e.g. `https://example.com`), `SITE_HOST` (the
-   same domain without the scheme, e.g. `example.com`), `SECRET` (any long
-   random string), and `UID_GID` (`id -u`, `id -g` — so files written under
-   `content/` belong to you, not root).
-
-4. Start the stack and open your site:
-
-   ```sh
+   ./bootstrap
    docker compose up -d
    ```
 
-   Then open `SITE_URL` in a browser. The first build of the site takes a few
-   seconds after the containers start; if you see a 404, wait and refresh.
+   `bootstrap` asks for your site URL, a password for the admin interface, and
+   who you are. It writes `.env` (filling in `.env.example`, generating the
+   signing secret and hashing your password) and `site.json` (filling in
+   `site.example.json` with your answers). It never overwrites either without
+   `--force`.
 
-5. Set your password and post something:
-
-   Open `SITE_URL/auth/new-password`, choose a password, and copy the hash
-   it gives you into `PASSWORD_SECRET` in `.env`. Then:
-
-   ```sh
-   docker compose up -d indiekit
-   ```
-
-   Open `SITE_URL/posts`: Indiekit asks you to sign in and brings you back
-   there. Post a note and see it on your homepage. (Indiekit's own front page
-   is `/`, which here is your site, so `/posts` and `/files` are the way in.)
+   Open `SITE_URL` for your site, and `SITE_URL/posts` to write. To set it up
+   without a terminal, set `INDIEKIT_PASSWORD` and run `./bootstrap` from a
+   script.
 
 ## Before the image is published
 
@@ -107,7 +89,8 @@ To see the theme with content before you have any, set `DEMO=1` in `.env`
 (with the local try-out values above) and start the stack. The theme's
 sample posts are copied into `content/`, the site builds with the theme's
 demo identity and sample webmentions, and `site.json` is left unread. Posting
-still works: finish step 5 and your note appears next to the samples.
+still works: sign in at `SITE_URL/posts` and your note appears next to the
+samples.
 
 Back to your own site: set `DEMO=0`, delete `content/*/fixture-*`, and
 restart the `site` service. With `DEMO=0` the samples are hidden even if
