@@ -1,6 +1,8 @@
 import { strict as assert } from "node:assert";
-import { readFileSync, existsSync, statSync, writeFileSync, unlinkSync } from "node:fs";
+import { readFileSync, existsSync, statSync, writeFileSync, unlinkSync, mkdtempSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 let failed = 0;
 const check = (name, fn) => { try { fn(); console.log("ok  ", name); } catch (e) { failed++; console.log("FAIL", name, "-", e.message); } };
@@ -167,6 +169,42 @@ process.stdin.on("end", () =>
   ).trim();
 
   assert.equal(ok, "true", "the hash does not verify against its own password");
+});
+
+check("bootstrap succeeds on a fresh clone, with no .env yet to supply compose.yml's interpolated variables", () => {
+  // A stale .env sitting in this working tree would make compose.yml parse
+  // fine and hide the exact bug this check exists to catch: SITE_HOST (and
+  // friends) are unset until bootstrap writes .env, and compose.yml needs
+  // them just to parse the file, even for --no-deps on an unrelated service.
+  const dir = mkdtempSync(join(tmpdir(), "indiekit-quickstart-"));
+  try {
+    const archive = execFileSync("git", ["archive", "HEAD"]);
+    execFileSync("tar", ["-x", "-C", dir], { input: archive });
+    assert.ok(!existsSync(join(dir, ".env")), "fresh clone must not already have a .env");
+
+    let output;
+    try {
+      output = execFileSync("./bootstrap", {
+        cwd: dir,
+        encoding: "utf8",
+        stdio: "pipe",
+        input: "",
+        env: {
+          ...process.env,
+          INDIEKIT_PASSWORD: "abcdefgh",
+          COMPOSE_FILE: "compose.yml:compose.local.yml",
+        },
+      });
+    } catch (error) {
+      throw new Error(`bootstrap failed on a fresh clone:\n${error.stdout ?? ""}${error.stderr ?? ""}`);
+    }
+
+    assert.match(output, /Wrote \.env/);
+    const env = readFileSync(join(dir, ".env"), "utf8");
+    assert.match(env, /^PASSWORD_SECRET=\$2b\$/m, "PASSWORD_SECRET is not a bcrypt hash");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 console.log(`\n${failed === 0 ? "all checks passed" : failed + " failed"}`);

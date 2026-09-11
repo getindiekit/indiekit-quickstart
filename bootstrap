@@ -62,7 +62,7 @@ const readPassword = async () => {
   }
 };
 
-const hashPassword = (password) => {
+const hashPassword = (password, composeEnv) => {
   try {
     // Password travels on stdin, never argv: /proc/<pid>/cmdline is
     // world-readable, so an argv password would leak to any local user.
@@ -74,11 +74,20 @@ process.stdin.on("data", (c) => (d += c));
 process.stdin.on("end", () =>
   import("bcrypt").then((m) => m.default.hash(d, 10)).then((h) => process.stdout.write(h)),
 );`],
-      { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], input: password },
+      {
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
+        input: password,
+        // compose.yml interpolates ${SITE_HOST} etc. to parse the file at
+        // all, even for --no-deps on an unrelated service. There is no .env
+        // yet — writing it is what this call is a step towards — so those
+        // variables must be supplied here directly.
+        env: { ...process.env, ...composeEnv },
+      },
     ).trim();
-  } catch {
+  } catch (error) {
     fail(
-      "Could not run the Indiekit image to hash the password.\n" +
+      `Could not run the Indiekit image to hash the password: ${error.stderr?.trim() || error.message}\n` +
         "If ghcr.io/getindiekit/indiekit:beta is not published yet, build it\n" +
         "locally and use compose.local.yml — see the README.",
     );
@@ -99,15 +108,21 @@ while (siteUrl === undefined) {
 const uid = execFileSync("id", ["-u"]).toString().trim();
 const gid = execFileSync("id", ["-g"]).toString().trim();
 
+const secret = generateSecret();
 const password = await readPassword();
-const passwordSecret = hashPassword(password);
+const passwordSecret = hashPassword(password, {
+  SITE_URL: siteUrl,
+  SITE_HOST: deriveSiteHost(siteUrl),
+  SECRET: secret,
+  UID_GID: `${uid}:${gid}`,
+});
 
 writeFileSync(
   ".env",
   renderEnv(readFileSync(".env.example", "utf8"), {
     SITE_URL: siteUrl,
     SITE_HOST: deriveSiteHost(siteUrl),
-    SECRET: generateSecret(),
+    SECRET: secret,
     PASSWORD_SECRET: passwordSecret,
     UID_GID: `${uid}:${gid}`,
   }),
