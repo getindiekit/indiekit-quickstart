@@ -54,5 +54,58 @@ check("the README's five steps name only files that exist", () => {
   for (const f of ["site.json", ".env.example", "compose.local.yml"]) assert.ok(readme.includes(f) && existsSync(f), `${f} named and present`);
 });
 
+import { generateSecret, deriveSiteHost, renderEnv, renderSiteJson } from "../bootstrap.lib.mjs";
+
+check("generateSecret returns 64 hex characters, different every time", () => {
+  const a = generateSecret();
+  const b = generateSecret();
+  assert.match(a, /^[0-9a-f]{64}$/);
+  assert.notEqual(a, b, "two runs produced the same secret");
+});
+
+check("deriveSiteHost takes the host from the URL", () => {
+  assert.equal(deriveSiteHost("https://example.com"), "example.com");
+  assert.equal(deriveSiteHost("http://quickstart.localhost"), "quickstart.localhost");
+  assert.equal(deriveSiteHost("https://example.com:8443/path"), "example.com:8443");
+  assert.throws(() => deriveSiteHost("not a url"));
+});
+
+check("renderEnv fills every key and leaves the comments", () => {
+  const template = readFileSync(".env.example", "utf8");
+  const out = renderEnv(template, {
+    SITE_URL: "https://example.com",
+    SITE_HOST: "example.com",
+    SECRET: "a".repeat(64),
+    PASSWORD_SECRET: "$2b$10$hash",
+    UID_GID: "1000:1000",
+  });
+  assert.match(out, /^SITE_URL=https:\/\/example\.com$/m);
+  assert.match(out, /^SITE_HOST=example\.com$/m);
+  assert.match(out, /^SECRET=a{64}$/m);
+  assert.match(out, /^PASSWORD_SECRET=\$2b\$10\$hash$/m);
+  assert.match(out, /^UID_GID=1000:1000$/m);
+  assert.ok(out.includes("# The one address everything is served from"), "comments were dropped");
+  assert.equal(/^[A-Z_]+=$/m.test(out), false, "a key was left empty");
+});
+
+check("renderSiteJson writes identity, with rel=me as an array", () => {
+  const template = readFileSync("site.json", "utf8");
+  const out = renderSiteJson(template, {
+    name: "My Site",
+    description: "Hello",
+    timezone: "Europe/Brussels",
+    authorName: "Ada",
+    authorUrl: "https://example.com",
+    authorNote: "",
+    authorMe: ["https://github.com/ada", "https://fosstodon.org/@ada"],
+  });
+  const parsed = JSON.parse(out);
+  assert.equal(parsed.name, "My Site");
+  assert.equal(parsed.timezone, "Europe/Brussels");
+  assert.equal(parsed.author.name, "Ada");
+  assert.equal(parsed.author.url, "https://example.com");
+  assert.deepEqual(parsed.author.me, ["https://github.com/ada", "https://fosstodon.org/@ada"]);
+});
+
 console.log(`\n${failed === 0 ? "all checks passed" : failed + " failed"}`);
 process.exit(failed ? 1 : 0);
