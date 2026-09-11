@@ -146,12 +146,17 @@ if (!untouched && !force) {
   const authorUrl = await ask("Your URL", siteUrl);
   const authorNote = await ask("A line about you (optional)", "");
 
+  // Unlike ask(), there is no single fallback value to hand back unattended:
+  // rl.question() never resolves once stdin has closed, so this loop, like
+  // ask(), must not run at all without a terminal.
   const authorMe = [];
-  console.log("  rel=me links, one per line, blank to finish:");
-  for (;;) {
-    const link = (await rl.question("  ")).trim();
-    if (link === "") break;
-    authorMe.push(link);
+  if (process.stdin.isTTY) {
+    console.log("  rel=me links, one per line, blank to finish:");
+    for (;;) {
+      const link = (await rl.question("  ")).trim();
+      if (link === "") break;
+      authorMe.push(link);
+    }
   }
 
   writeFileSync(
