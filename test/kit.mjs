@@ -66,7 +66,8 @@ check("generateSecret returns 64 hex characters, different every time", () => {
 check("deriveSiteHost takes the host from the URL", () => {
   assert.equal(deriveSiteHost("https://example.com"), "example.com");
   assert.equal(deriveSiteHost("http://quickstart.localhost"), "quickstart.localhost");
-  assert.equal(deriveSiteHost("https://example.com:8443/path"), "example.com:8443");
+  // port is dropped because extra_hosts in compose.yml needs a bare hostname
+  assert.equal(deriveSiteHost("https://example.com:8443/path"), "example.com");
   assert.throws(() => deriveSiteHost("not a url"));
 });
 

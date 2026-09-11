@@ -10,9 +10,9 @@ export const generateSecret = () => randomBytes(32).toString("hex");
 /**
  * The host part of the site URL, for the container's extra_hosts entry
  * @param {string} siteUrl - The site's full URL
- * @returns {string} Host, including a port when one is given
+ * @returns {string} Hostname without port, since extra_hosts needs a bare hostname
  */
-export const deriveSiteHost = (siteUrl) => new URL(siteUrl).host;
+export const deriveSiteHost = (siteUrl) => new URL(siteUrl).hostname;
 
 /**
  * Fill the env template, keeping its comments: they explain each key, and a
