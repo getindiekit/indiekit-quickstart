@@ -13,14 +13,21 @@ const fail = (message) => {
   process.exit(1);
 };
 
-if (existsSync(".env") && !force) {
-  fail(
-    ".env already exists. Bootstrap will not overwrite it: regenerating SECRET\n" +
-      "would invalidate every token already issued. Pass --force to replace it.",
-  );
+if (!existsSync("compose.yml")) {
+  fail("Run ./bootstrap from the indiekit-quickstart repo root (no compose.yml here).");
 }
 
-// Docker is needed to hash the password, so check before asking for one.
+const SECRET_WARNING =
+  "Regenerating SECRET invalidates every session and token already issued.";
+
+if (existsSync(".env")) {
+  if (!force) {
+    fail(`.env already exists. Bootstrap will not overwrite it: ${SECRET_WARNING}\nPass --force to replace it.`);
+  }
+  console.log(`--force: replacing .env. ${SECRET_WARNING}`);
+}
+
+// Docker is needed to hash the password, so check before asking for anything.
 try {
   execFileSync("docker", ["compose", "version"], { stdio: "pipe" });
 } catch {
@@ -29,10 +36,54 @@ try {
 
 const rl = createInterface({ input: process.stdin, output: process.stdout });
 
+// Every prompt goes through rawQuestion, so there is exactly one place that
+// turns Ctrl-D into something other than an uncaught AbortError and a raw
+// stack trace: on a real TTY, reaching EOF mid-prompt rejects rl.question()
+// with one. (A non-TTY stdin behaves differently again — it never resolves
+// at all, which is why ask() and askList() below never call this without
+// checking isTTY first.)
+class Eof extends Error {}
+
+const rawQuestion = async (prompt) => {
+  try {
+    return await rl.question(prompt);
+  } catch (error) {
+    if (error.name === "AbortError") throw new Eof();
+    throw error;
+  }
+};
+
+// The one way to ask a single question with a default. Owns both the
+// non-TTY fallback and the Ctrl-D fallback — no bare rl.question outside
+// this and askList()/readPassword() below.
 const ask = async (question, fallback) => {
   if (!process.stdin.isTTY) return fallback;
-  const answer = (await rl.question(`${question} [${fallback}] `)).trim();
-  return answer === "" ? fallback : answer;
+  try {
+    const answer = (await rawQuestion(`${question} [${fallback}] `)).trim();
+    return answer === "" ? fallback : answer;
+  } catch (error) {
+    if (error instanceof Eof) return fallback;
+    throw error;
+  }
+};
+
+// Same shape as ask(), for a repeated free-form list (rel=me links). There
+// is no single fallback value to hand back unattended or on Ctrl-D, so both
+// mean "none".
+const askList = async (question) => {
+  if (!process.stdin.isTTY) return [];
+  console.log(`  ${question}, one per line, blank to finish:`);
+  const items = [];
+  try {
+    for (;;) {
+      const line = (await rawQuestion("  ")).trim();
+      if (line === "") break;
+      items.push(line);
+    }
+  } catch (error) {
+    if (!(error instanceof Eof)) throw error;
+  }
+  return items;
 };
 
 const readPassword = async () => {
@@ -47,18 +98,42 @@ const readPassword = async () => {
     return fromEnvironment;
   }
 
-  for (;;) {
-    const first = await rl.question("Password for the admin interface: ");
-    if (first.length < 8) {
-      console.error("  At least 8 characters, please.");
-      continue;
+  // Mute keystroke echo for one prompt. readline/promises has no
+  // _writeToOutput hook to override (that trick is classic callback-style
+  // readline only) so intercept the output stream's write() instead,
+  // restoring it in a finally — including on throw, e.g. Ctrl-D mid-prompt.
+  const askHidden = async (prompt) => {
+    const output = rl.output;
+    const originalWrite = output.write.bind(output);
+    originalWrite(prompt);
+    let muted = true;
+    output.write = (chunk, ...args) => (muted ? true : originalWrite(chunk, ...args));
+    try {
+      return await rawQuestion("");
+    } finally {
+      muted = false;
+      output.write = originalWrite;
+      originalWrite("\n");
     }
-    const second = await rl.question("Again: ");
-    if (first !== second) {
-      console.error("  Those did not match.");
-      continue;
+  };
+
+  try {
+    for (;;) {
+      const first = await askHidden("Password for the admin interface: ");
+      if (first.length < 8) {
+        console.error("  At least 8 characters, please.");
+        continue;
+      }
+      const second = await askHidden("Again: ");
+      if (first !== second) {
+        console.error("  Those did not match.");
+        continue;
+      }
+      return first;
     }
-    return first;
+  } catch (error) {
+    if (error instanceof Eof) fail("\nNo password entered.");
+    throw error;
   }
 };
 
@@ -94,9 +169,14 @@ process.stdin.on("end", () =>
   }
 };
 
+// --- Collect every answer first. Nothing is written to disk until every
+// answer (site URL, password, identity) is in hand and the password is
+// hashed — a failed or abandoned run must never leave .env written without
+// a matching site.json, or vice versa.
+
 let siteUrl;
 while (siteUrl === undefined) {
-  const answer = await ask("Site URL", "http://quickstart.localhost");
+  const answer = await ask("Site URL", process.env.INDIEKIT_SITE_URL || "http://quickstart.localhost");
   try {
     deriveSiteHost(answer);
     siteUrl = answer;
@@ -105,14 +185,47 @@ while (siteUrl === undefined) {
   }
 }
 
+const password = await readPassword();
+
+// Identity: the h-card, rel="author" and the author meta tag all come from
+// site.json. An edited site.json is left alone, same as without --force.
+const siteTemplate = readFileSync("site.json", "utf8");
+const siteUntouched = siteTemplate === readFileSync("site.example.json", "utf8");
+const askIdentity = siteUntouched || force;
+
+let identity;
+if (askIdentity) {
+  const name = await ask("Site name", "My site");
+  const description = await ask("Description", JSON.parse(siteTemplate).description);
+  const timezone = await ask("Timezone", Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const authorName = await ask("Your name", process.env.INDIEKIT_AUTHOR_NAME || "");
+  const authorUrl = await ask("Your URL", siteUrl);
+  const authorNote = await ask("A line about you (optional)", "");
+  const authorMe = await askList("rel=me links");
+  identity = { name, description, timezone, authorName, authorUrl, authorNote, authorMe };
+
+  if (!authorName && !process.stdin.isTTY) {
+    console.error(
+      "Warning: no author name set, so the site will publish with no discoverable\n" +
+        "identity (h-card, rel=author and the author meta tag all come from\n" +
+        "site.json's author.name). Set INDIEKIT_AUTHOR_NAME and re-run, or edit\n" +
+        "site.json's author.name afterwards.",
+    );
+  }
+}
+
+rl.close();
+
+// --- Everything needed is now in hand. Hash the password — the one
+// remaining step that can fail — then write both files.
+
 const uid = execFileSync("id", ["-u"]).toString().trim();
 const gid = execFileSync("id", ["-g"]).toString().trim();
-
 const secret = generateSecret();
-const password = await readPassword();
+const siteHost = deriveSiteHost(siteUrl);
 const passwordSecret = hashPassword(password, {
   SITE_URL: siteUrl,
-  SITE_HOST: deriveSiteHost(siteUrl),
+  SITE_HOST: siteHost,
   SECRET: secret,
   UID_GID: `${uid}:${gid}`,
 });
@@ -121,58 +234,17 @@ writeFileSync(
   ".env",
   renderEnv(readFileSync(".env.example", "utf8"), {
     SITE_URL: siteUrl,
-    SITE_HOST: deriveSiteHost(siteUrl),
+    SITE_HOST: siteHost,
     SECRET: secret,
     PASSWORD_SECRET: passwordSecret,
     UID_GID: `${uid}:${gid}`,
   }),
 );
-
 console.log("Wrote .env");
 
-// Identity: the h-card, rel="author" and the author meta tag all come from
-// here. Left at the template's blanks, the site publishes with no
-// discoverable identity at all.
-const siteTemplate = readFileSync("site.json", "utf8");
-const untouched = siteTemplate === readFileSync("site.example.json", "utf8");
-
-if (!untouched && !force) {
-  console.log("site.json has been edited; leaving it alone.");
-} else {
-  const name = await ask("Site name", "My site");
-  const description = await ask("Description", JSON.parse(siteTemplate).description);
-  const timezone = await ask("Timezone", Intl.DateTimeFormat().resolvedOptions().timeZone);
-  const authorName = await ask("Your name", "");
-  const authorUrl = await ask("Your URL", siteUrl);
-  const authorNote = await ask("A line about you (optional)", "");
-
-  // Unlike ask(), there is no single fallback value to hand back unattended:
-  // rl.question() never resolves once stdin has closed, so this loop, like
-  // ask(), must not run at all without a terminal.
-  const authorMe = [];
-  if (process.stdin.isTTY) {
-    console.log("  rel=me links, one per line, blank to finish:");
-    for (;;) {
-      const link = (await rl.question("  ")).trim();
-      if (link === "") break;
-      authorMe.push(link);
-    }
-  }
-
-  writeFileSync(
-    "site.json",
-    renderSiteJson(siteTemplate, {
-      name,
-      description,
-      timezone,
-      authorName,
-      authorUrl,
-      authorNote,
-      authorMe,
-    }),
-  );
-
+if (identity) {
+  writeFileSync("site.json", renderSiteJson(siteTemplate, identity));
   console.log("Wrote site.json");
+} else {
+  console.log("site.json has been edited; leaving it alone.");
 }
-
-rl.close();
