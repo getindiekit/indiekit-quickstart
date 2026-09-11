@@ -1,11 +1,26 @@
 import { strict as assert } from "node:assert";
 import { readFileSync, existsSync, statSync, writeFileSync, unlinkSync, mkdtempSync, rmSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 let failed = 0;
 const check = (name, fn) => { try { fn(); console.log("ok  ", name); } catch (e) { failed++; console.log("FAIL", name, "-", e.message); } };
+
+// A clean checkout in its own directory: running bootstrap in the repo root
+// itself would write a real .env there, breaking a second run of the suite
+// and leaving a bcrypt credential in the working tree.
+const freshClone = () => {
+  const dir = mkdtempSync(join(tmpdir(), "indiekit-quickstart-"));
+  const archive = execFileSync("git", ["archive", "HEAD"]);
+  execFileSync("tar", ["-x", "-C", dir], { input: archive });
+  return dir;
+};
+
+// Only what bootstrap actually needs, not the whole ambient environment —
+// a stray SITE_HOST or SECRET already exported in the shell could mask a
+// regression that a full ...process.env would hide.
+const minimalEnv = (extra) => ({ PATH: process.env.PATH, HOME: process.env.HOME, ...extra });
 
 check("indiekit.config.js is the theme's, byte for byte", () => {
   assert.equal(readFileSync("indiekit.config.js", "utf8"), readFileSync("site/indiekit.config.js", "utf8"));
@@ -176,26 +191,29 @@ process.stdin.on("end", () =>
 });
 
 check("bootstrap leaves an edited site.json alone", () => {
-  const saved = readFileSync("site.json", "utf8");
-  writeFileSync("site.json", JSON.stringify({ name: "Edited by hand" }, undefined, 2));
-
-  let output = "";
+  const dir = freshClone();
   try {
-    output = execFileSync("./bootstrap", {
-      encoding: "utf8",
-      stdio: "pipe",
-      input: "",
-      env: { ...process.env, INDIEKIT_PASSWORD: "abcdefgh" },
-    });
-  } catch (error) {
-    output = `${error.stdout ?? ""}${error.stderr ?? ""}`;
+    writeFileSync(join(dir, "site.json"), JSON.stringify({ name: "Edited by hand" }, undefined, 2));
+
+    let output = "";
+    try {
+      output = execFileSync("./bootstrap", {
+        cwd: dir,
+        encoding: "utf8",
+        stdio: "pipe",
+        input: "",
+        env: minimalEnv({ INDIEKIT_PASSWORD: "abcdefgh", COMPOSE_FILE: "compose.yml:compose.local.yml" }),
+      });
+    } catch (error) {
+      output = `${error.stdout ?? ""}${error.stderr ?? ""}`;
+    }
+
+    const after = JSON.parse(readFileSync(join(dir, "site.json"), "utf8"));
+    assert.equal(after.name, "Edited by hand", "bootstrap overwrote an edited site.json");
+    assert.match(output, /site\.json/, "bootstrap did not say it was leaving site.json alone");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
-
-  const after = JSON.parse(readFileSync("site.json", "utf8"));
-  writeFileSync("site.json", saved);
-
-  assert.equal(after.name, "Edited by hand", "bootstrap overwrote an edited site.json");
-  assert.match(output, /site\.json/, "bootstrap did not say it was leaving site.json alone");
 });
 
 check("bootstrap succeeds on a fresh clone, with no .env yet to supply compose.yml's interpolated variables", () => {
@@ -203,10 +221,8 @@ check("bootstrap succeeds on a fresh clone, with no .env yet to supply compose.y
   // fine and hide the exact bug this check exists to catch: SITE_HOST (and
   // friends) are unset until bootstrap writes .env, and compose.yml needs
   // them just to parse the file, even for --no-deps on an unrelated service.
-  const dir = mkdtempSync(join(tmpdir(), "indiekit-quickstart-"));
+  const dir = freshClone();
   try {
-    const archive = execFileSync("git", ["archive", "HEAD"]);
-    execFileSync("tar", ["-x", "-C", dir], { input: archive });
     assert.ok(!existsSync(join(dir, ".env")), "fresh clone must not already have a .env");
 
     let output;
@@ -216,11 +232,7 @@ check("bootstrap succeeds on a fresh clone, with no .env yet to supply compose.y
         encoding: "utf8",
         stdio: "pipe",
         input: "",
-        env: {
-          ...process.env,
-          INDIEKIT_PASSWORD: "abcdefgh",
-          COMPOSE_FILE: "compose.yml:compose.local.yml",
-        },
+        env: minimalEnv({ INDIEKIT_PASSWORD: "abcdefgh", COMPOSE_FILE: "compose.yml:compose.local.yml" }),
       });
     } catch (error) {
       throw new Error(`bootstrap failed on a fresh clone:\n${error.stdout ?? ""}${error.stderr ?? ""}`);
@@ -229,6 +241,58 @@ check("bootstrap succeeds on a fresh clone, with no .env yet to supply compose.y
     assert.match(output, /Wrote \.env/);
     const env = readFileSync(join(dir, ".env"), "utf8");
     assert.match(env, /^PASSWORD_SECRET=\$2b\$/m, "PASSWORD_SECRET is not a bcrypt hash");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+check("unattended run with no author name warns to stderr but still succeeds", () => {
+  // This is exactly the outcome that puts site.json in scope at all: without
+  // a name, the h-card, rel=author and the author meta tag are all empty,
+  // and a newcomer following the README's unattended path would never know.
+  const dir = freshClone();
+  try {
+    const result = spawnSync("./bootstrap", [], {
+      cwd: dir,
+      encoding: "utf8",
+      input: "",
+      env: minimalEnv({ INDIEKIT_PASSWORD: "abcdefgh", COMPOSE_FILE: "compose.yml:compose.local.yml" }),
+    });
+
+    assert.equal(result.status, 0, `bootstrap failed unattended:\n${result.stdout}${result.stderr}`);
+    assert.match(result.stderr, /no author name set/i, "missing the no-identity warning");
+
+    const site = JSON.parse(readFileSync(join(dir, "site.json"), "utf8"));
+    assert.equal(site.author.name, "", "author.name should be empty with no override");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+check("INDIEKIT_AUTHOR_NAME and INDIEKIT_SITE_URL override the unattended identity, no warning", () => {
+  const dir = freshClone();
+  try {
+    const result = spawnSync("./bootstrap", [], {
+      cwd: dir,
+      encoding: "utf8",
+      input: "",
+      env: minimalEnv({
+        INDIEKIT_PASSWORD: "abcdefgh",
+        INDIEKIT_AUTHOR_NAME: "Ada Lovelace",
+        INDIEKIT_SITE_URL: "http://example.localhost",
+        COMPOSE_FILE: "compose.yml:compose.local.yml",
+      }),
+    });
+
+    assert.equal(result.status, 0, `bootstrap failed unattended:\n${result.stdout}${result.stderr}`);
+    assert.doesNotMatch(result.stderr, /no author name set/i, "warned despite INDIEKIT_AUTHOR_NAME");
+
+    const site = JSON.parse(readFileSync(join(dir, "site.json"), "utf8"));
+    assert.equal(site.author.name, "Ada Lovelace");
+
+    const env = readFileSync(join(dir, ".env"), "utf8");
+    assert.match(env, /^SITE_URL=http:\/\/example\.localhost$/m);
+    assert.match(env, /^SITE_HOST=example\.localhost$/m);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
