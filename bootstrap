@@ -1,0 +1,63 @@
+#!/usr/bin/env node
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { createInterface } from "node:readline/promises";
+import process from "node:process";
+
+import { deriveSiteHost, generateSecret, renderEnv } from "./bootstrap.lib.mjs";
+
+const force = process.argv.includes("--force");
+
+const fail = (message) => {
+  console.error(message);
+  process.exit(1);
+};
+
+if (existsSync(".env") && !force) {
+  fail(
+    ".env already exists. Bootstrap will not overwrite it: regenerating SECRET\n" +
+      "would invalidate every token already issued. Pass --force to replace it.",
+  );
+}
+
+// Docker is needed to hash the password, so check before asking for one.
+try {
+  execFileSync("docker", ["compose", "version"], { stdio: "pipe" });
+} catch {
+  fail("Docker does not appear to be running. Start it and try again.");
+}
+
+const rl = createInterface({ input: process.stdin, output: process.stdout });
+
+const ask = async (question, fallback) => {
+  const answer = (await rl.question(`${question} [${fallback}] `)).trim();
+  return answer === "" ? fallback : answer;
+};
+
+let siteUrl;
+while (siteUrl === undefined) {
+  const answer = await ask("Site URL", "http://quickstart.localhost");
+  try {
+    deriveSiteHost(answer);
+    siteUrl = answer;
+  } catch {
+    console.error(`  ${answer} is not a URL. Include the scheme, e.g. https://example.com`);
+  }
+}
+
+const uid = execFileSync("id", ["-u"]).toString().trim();
+const gid = execFileSync("id", ["-g"]).toString().trim();
+
+writeFileSync(
+  ".env",
+  renderEnv(readFileSync(".env.example", "utf8"), {
+    SITE_URL: siteUrl,
+    SITE_HOST: deriveSiteHost(siteUrl),
+    SECRET: generateSecret(),
+    PASSWORD_SECRET: "",
+    UID_GID: `${uid}:${gid}`,
+  }),
+);
+
+console.log("Wrote .env");
+rl.close();

@@ -1,5 +1,5 @@
 import { strict as assert } from "node:assert";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, statSync, writeFileSync, unlinkSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 
 let failed = 0;
@@ -113,6 +113,24 @@ check("renderSiteJson writes identity, with rel=me as an array", () => {
   assert.equal(parsed.author.name, "Ada");
   assert.equal(parsed.author.url, "https://example.com");
   assert.deepEqual(parsed.author.me, ["https://github.com/ada", "https://fosstodon.org/@ada"]);
+});
+
+check("bootstrap is executable and refuses to clobber an existing .env", () => {
+  assert.ok(statSync("bootstrap").mode & 0o111, "bootstrap is not executable");
+
+  const hadEnv = existsSync(".env");
+  const saved = hadEnv ? readFileSync(".env", "utf8") : undefined;
+  if (!hadEnv) writeFileSync(".env", "SECRET=existing\n");
+
+  let exitCode = 0;
+  try {
+    execFileSync("./bootstrap", { stdio: "pipe", env: { ...process.env, INDIEKIT_PASSWORD: "abcdefgh" } });
+  } catch (error) {
+    exitCode = error.status;
+  }
+
+  assert.notEqual(exitCode, 0, "bootstrap overwrote an existing .env");
+  if (!hadEnv) unlinkSync(".env"); else writeFileSync(".env", saved);
 });
 
 console.log(`\n${failed === 0 ? "all checks passed" : failed + " failed"}`);
