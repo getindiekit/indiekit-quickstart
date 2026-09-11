@@ -138,22 +138,32 @@ check("the hash bootstrap writes verifies against the password", () => {
   // End to end: a hash of the right shape that fails bcrypt.compare would
   // strand a newcomer at the sign-in screen with nothing to debug.
   const password = "correct horse battery";
+  // Password goes on stdin, not argv — /proc/<pid>/cmdline is world-readable.
   const hash = execFileSync(
     "docker",
-    ["compose", "run", "--rm", "--no-deps", "--entrypoint", "node", "indiekit",
-     "-e", "import('bcrypt').then(m=>m.default.hash(process.argv[1],10)).then(h=>process.stdout.write(h))",
-     password],
-    { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] },
+    ["compose", "run", "--rm", "--no-deps", "-T", "--entrypoint", "node", "indiekit",
+     "-e", `let d = "";
+process.stdin.on("data", (c) => (d += c));
+process.stdin.on("end", () =>
+  import("bcrypt").then((m) => m.default.hash(d, 10)).then((h) => process.stdout.write(h)),
+);`],
+    { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], input: password },
   ).trim();
 
   assert.match(hash, /^\$2[aby]\$/, "not a bcrypt hash");
 
+  // The hash is not the secret being protected, so it may stay in argv;
+  // "--" keeps it from being parsed as a node flag.
   const ok = execFileSync(
     "docker",
-    ["compose", "run", "--rm", "--no-deps", "--entrypoint", "node", "indiekit",
-     "-e", "import('bcrypt').then(m=>m.default.compare(process.argv[1],process.argv[2])).then(r=>process.stdout.write(String(r)))",
-     password, hash],
-    { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] },
+    ["compose", "run", "--rm", "--no-deps", "-T", "--entrypoint", "node", "indiekit",
+     "-e", `let d = "";
+process.stdin.on("data", (c) => (d += c));
+process.stdin.on("end", () =>
+  import("bcrypt").then((m) => m.default.compare(d, process.argv[1])).then((r) => process.stdout.write(String(r))),
+);`,
+     "--", hash],
+    { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], input: password },
   ).trim();
 
   assert.equal(ok, "true", "the hash does not verify against its own password");

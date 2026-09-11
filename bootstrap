@@ -64,12 +64,17 @@ const readPassword = async () => {
 
 const hashPassword = (password) => {
   try {
+    // Password travels on stdin, never argv: /proc/<pid>/cmdline is
+    // world-readable, so an argv password would leak to any local user.
     return execFileSync(
       "docker",
-      ["compose", "run", "--rm", "--no-deps", "--entrypoint", "node", "indiekit",
-       "-e", "import('bcrypt').then(m=>m.default.hash(process.argv[1],10)).then(h=>process.stdout.write(h))",
-       password],
-      { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] },
+      ["compose", "run", "--rm", "--no-deps", "-T", "--entrypoint", "node", "indiekit",
+       "-e", `let d = "";
+process.stdin.on("data", (c) => (d += c));
+process.stdin.on("end", () =>
+  import("bcrypt").then((m) => m.default.hash(d, 10)).then((h) => process.stdout.write(h)),
+);`],
+      { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], input: password },
     ).trim();
   } catch {
     fail(
