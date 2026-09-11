@@ -20,7 +20,20 @@ const freshClone = () => {
 // Only what bootstrap actually needs, not the whole ambient environment —
 // a stray SITE_HOST or SECRET already exported in the shell could mask a
 // regression that a full ...process.env would hide.
-const minimalEnv = (extra) => ({ PATH: process.env.PATH, HOME: process.env.HOME, ...extra });
+//
+// COMPOSE_PROJECT_NAME: each freshClone() is a uniquely-named tmpdir, and
+// `docker compose run` derives its project (and the network it creates for
+// it) from the working directory's name by default. Left unset, every
+// bootstrap invocation in this suite would create and leak its own network
+// (docker compose run --rm removes the container, not the network) until
+// Docker's address pool is exhausted. Pin one project name so they all
+// reuse the same network instead.
+const minimalEnv = (extra) => ({
+  PATH: process.env.PATH,
+  HOME: process.env.HOME,
+  COMPOSE_PROJECT_NAME: "indiekit-quickstart-kit-test",
+  ...extra,
+});
 
 check("indiekit.config.js is the theme's, byte for byte", () => {
   assert.equal(readFileSync("indiekit.config.js", "utf8"), readFileSync("site/indiekit.config.js", "utf8"));
