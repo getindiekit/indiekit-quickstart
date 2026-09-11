@@ -88,6 +88,14 @@ check("renderEnv fills every key and leaves the comments", () => {
   assert.equal(/^[A-Z_]+=$/m.test(out), false, "a key was left empty");
 });
 
+check("renderEnv writes values containing $ literally", () => {
+  // String.replace treats $&, $$, $` and $' specially in a string
+  // replacement. A replacer function does not.
+  const out = renderEnv("SECRET=\nSITE_URL=\n", { SECRET: "abc$&def", SITE_URL: "a$`b$'c$$d" });
+  assert.match(out, /^SECRET=abc\$&def$/m);
+  assert.match(out, /^SITE_URL=a\$`b\$'c\$\$d$/m);
+});
+
 check("renderSiteJson writes identity, with rel=me as an array", () => {
   const template = readFileSync("site.json", "utf8");
   const out = renderSiteJson(template, {

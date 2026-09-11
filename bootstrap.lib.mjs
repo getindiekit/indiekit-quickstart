@@ -27,7 +27,7 @@ export const renderEnv = (template, values) => {
   for (const [key, value] of Object.entries(values)) {
     const line = new RegExp(`^${key}=.*$`, "m");
     output = line.test(output)
-      ? output.replace(line, `${key}=${value}`)
+      ? output.replace(line, () => `${key}=${value}`)
       : `${output.trimEnd()}\n${key}=${value}\n`;
   }
 
