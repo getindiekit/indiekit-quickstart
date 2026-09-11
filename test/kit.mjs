@@ -134,5 +134,30 @@ check("bootstrap is executable and refuses to clobber an existing .env", () => {
   if (!hadEnv) unlinkSync(".env"); else writeFileSync(".env", saved);
 });
 
+check("the hash bootstrap writes verifies against the password", () => {
+  // End to end: a hash of the right shape that fails bcrypt.compare would
+  // strand a newcomer at the sign-in screen with nothing to debug.
+  const password = "correct horse battery";
+  const hash = execFileSync(
+    "docker",
+    ["compose", "run", "--rm", "--no-deps", "--entrypoint", "node", "indiekit",
+     "-e", "import('bcrypt').then(m=>m.default.hash(process.argv[1],10)).then(h=>process.stdout.write(h))",
+     password],
+    { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] },
+  ).trim();
+
+  assert.match(hash, /^\$2[aby]\$/, "not a bcrypt hash");
+
+  const ok = execFileSync(
+    "docker",
+    ["compose", "run", "--rm", "--no-deps", "--entrypoint", "node", "indiekit",
+     "-e", "import('bcrypt').then(m=>m.default.compare(process.argv[1],process.argv[2])).then(r=>process.stdout.write(String(r)))",
+     password, hash],
+    { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] },
+  ).trim();
+
+  assert.equal(ok, "true", "the hash does not verify against its own password");
+});
+
 console.log(`\n${failed === 0 ? "all checks passed" : failed + " failed"}`);
 process.exit(failed ? 1 : 0);

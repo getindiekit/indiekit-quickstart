@@ -30,8 +30,54 @@ try {
 const rl = createInterface({ input: process.stdin, output: process.stdout });
 
 const ask = async (question, fallback) => {
+  if (!process.stdin.isTTY) return fallback;
   const answer = (await rl.question(`${question} [${fallback}] `)).trim();
   return answer === "" ? fallback : answer;
+};
+
+const readPassword = async () => {
+  if (!process.stdin.isTTY) {
+    const fromEnvironment = process.env.INDIEKIT_PASSWORD;
+    if (!fromEnvironment || fromEnvironment.length < 8) {
+      fail(
+        "No terminal to prompt on. Set INDIEKIT_PASSWORD (at least 8 characters)\n" +
+          "to run bootstrap unattended.",
+      );
+    }
+    return fromEnvironment;
+  }
+
+  for (;;) {
+    const first = await rl.question("Password for the admin interface: ");
+    if (first.length < 8) {
+      console.error("  At least 8 characters, please.");
+      continue;
+    }
+    const second = await rl.question("Again: ");
+    if (first !== second) {
+      console.error("  Those did not match.");
+      continue;
+    }
+    return first;
+  }
+};
+
+const hashPassword = (password) => {
+  try {
+    return execFileSync(
+      "docker",
+      ["compose", "run", "--rm", "--no-deps", "--entrypoint", "node", "indiekit",
+       "-e", "import('bcrypt').then(m=>m.default.hash(process.argv[1],10)).then(h=>process.stdout.write(h))",
+       password],
+      { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] },
+    ).trim();
+  } catch {
+    fail(
+      "Could not run the Indiekit image to hash the password.\n" +
+        "If ghcr.io/getindiekit/indiekit:beta is not published yet, build it\n" +
+        "locally and use compose.local.yml — see the README.",
+    );
+  }
 };
 
 let siteUrl;
@@ -48,13 +94,16 @@ while (siteUrl === undefined) {
 const uid = execFileSync("id", ["-u"]).toString().trim();
 const gid = execFileSync("id", ["-g"]).toString().trim();
 
+const password = await readPassword();
+const passwordSecret = hashPassword(password);
+
 writeFileSync(
   ".env",
   renderEnv(readFileSync(".env.example", "utf8"), {
     SITE_URL: siteUrl,
     SITE_HOST: deriveSiteHost(siteUrl),
     SECRET: generateSecret(),
-    PASSWORD_SECRET: "",
+    PASSWORD_SECRET: passwordSecret,
     UID_GID: `${uid}:${gid}`,
   }),
 );
