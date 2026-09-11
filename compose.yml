@@ -16,7 +16,7 @@ services:
     # container itself (localhost) and not depend on the network hairpinning
     # back in; mapping the host name to the Docker host does both.
     extra_hosts:
-      - "${SITE_HOST}:host-gateway"
+      - "${SITE_HOST:-quickstart.localhost}:host-gateway"
     depends_on:
       mongo:
         condition: service_healthy
