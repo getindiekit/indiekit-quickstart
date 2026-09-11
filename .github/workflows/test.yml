@@ -17,7 +17,21 @@ jobs:
         with:
           node-version: 24
 
-      - run: node test/kit.mjs
+      # ghcr.io/getindiekit/indiekit:beta is not published yet (the image
+      # itself is still getindiekit/indiekit#960, an open PR) — pin to that
+      # PR's branch head and build it ourselves, the same way compose.local.yml
+      # tells a person to. Swap this for a `docker pull` once it's published;
+      # skipping the Docker-dependent checks instead is not an option — a
+      # skipped security check is worse than a red one.
+      - uses: actions/checkout@v4
+        with:
+          repository: getindiekit/indiekit
+          ref: 0b3b35466711f4c6d898a6700b423b44dacaeb2a
+          path: indiekit-image-source
+
+      - run: docker build -t indiekit:local indiekit-image-source
+
+      - run: COMPOSE_FILE=compose.yml:compose.local.yml node test/kit.mjs
 
       - run: docker build -f site.Dockerfile -t site:check .
 
