@@ -21,6 +21,22 @@ export const deriveSiteHost = (siteUrl) => new URL(siteUrl).hostname;
  * @param {object} values - One property per key to set
  * @returns {string} Contents for .env
  */
+/**
+ * Escape a value so Docker Compose passes it to the container unchanged
+ *
+ * Compose treats `$` in a .env value as the start of a variable reference and
+ * substitutes it away. A bcrypt hash is full of them: `$2b$10$FzWT…` reaches
+ * the container as `$2b$10/…`, several characters shorter and matching no
+ * password anyone could type. Doubling each `$` is how Compose is told to
+ * mean the character itself.
+ *
+ * Kept separate from `renderEnv`, which writes what it is given: only values
+ * Compose will interpolate need this, and the caller knows which those are.
+ * @param {string} value - Raw value
+ * @returns {string} Value safe to write into .env
+ */
+export const escapeForCompose = (value) => String(value).replaceAll("$", "$$$$");
+
 export const renderEnv = (template, values) => {
   let output = template;
 

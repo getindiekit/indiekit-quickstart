@@ -4,7 +4,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
 import process from "node:process";
 
-import { deriveSiteHost, generateSecret, renderEnv, renderSiteJson } from "./bootstrap.lib.mjs";
+import { deriveSiteHost, escapeForCompose, generateSecret, renderEnv, renderSiteJson } from "./bootstrap.lib.mjs";
 
 const force = process.argv.includes("--force");
 
@@ -241,7 +241,8 @@ writeFileSync(
     SITE_URL: siteUrl,
     SITE_HOST: siteHost,
     SECRET: secret,
-    PASSWORD_SECRET: passwordSecret,
+    // Compose eats `$` in a .env value; a bcrypt hash is full of them.
+    PASSWORD_SECRET: escapeForCompose(passwordSecret),
     UID_GID: `${uid}:${gid}`,
   }),
 );

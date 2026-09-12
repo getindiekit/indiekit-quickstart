@@ -339,5 +339,45 @@ check("Ctrl-D after the first prompt is handled the same way everywhere: no stac
   }
 });
 
+check("the password hash survives Docker Compose's env interpolation", () => {
+  // A bcrypt hash is full of `$`, and Compose treats `$` in a .env value as a
+  // variable reference: `$2b$10$FzWT…` loses `$FzWT` entirely and the
+  // container receives a 55-character corruption of a 60-character hash, which
+  // no password can ever match. Reading the file proves nothing — the damage
+  // happens between the file and the process, so this reads the value back
+  // from inside a container.
+  const password = "interpolation-proof-1";
+  const dir = freshClone();
+  try {
+    execFileSync("./bootstrap", {
+      cwd: dir,
+      stdio: "pipe",
+      env: minimalEnv({ INDIEKIT_PASSWORD: password, COMPOSE_FILE: "compose.yml:compose.local.yml" }),
+    });
+
+    const seen = execFileSync(
+      "docker",
+      ["compose", "run", "--rm", "--no-deps", "-T", "--entrypoint", "node", "indiekit",
+       "-e", 'process.stdout.write(process.env.PASSWORD_SECRET || "")'],
+      { cwd: dir, encoding: "utf8", stdio: ["pipe", "pipe", "pipe"],
+        env: minimalEnv({ COMPOSE_FILE: "compose.yml:compose.local.yml" }) },
+    ).trim();
+
+    assert.equal(seen.length, 60, `container saw a ${seen.length}-character hash, not 60`);
+
+    const verified = execFileSync(
+      "docker",
+      ["compose", "run", "--rm", "--no-deps", "-T", "--entrypoint", "node", "indiekit",
+       "-e", 'let d="";process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>import("bcrypt").then(m=>m.default.compare(d,process.env.PASSWORD_SECRET)).then(r=>process.stdout.write(String(r))))'],
+      { cwd: dir, input: password, encoding: "utf8", stdio: ["pipe", "pipe", "pipe"],
+        env: minimalEnv({ COMPOSE_FILE: "compose.yml:compose.local.yml" }) },
+    ).trim();
+
+    assert.equal(verified, "true", "the hash the container received does not match the password");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 console.log(`\n${failed === 0 ? "all checks passed" : failed + " failed"}`);
 process.exit(failed ? 1 : 0);
