@@ -10,10 +10,21 @@ const check = (name, fn) => { try { fn(); console.log("ok  ", name); } catch (e)
 // A clean checkout in its own directory: running bootstrap in the repo root
 // itself would write a real .env there, breaking a second run of the suite
 // and leaving a bcrypt credential in the working tree.
+/**
+ * A clone of the tracked files as they are **right now**, not as they were at
+ * the last commit. `git archive HEAD` would give the latter, which quietly
+ * makes these checks untestable: a change to bootstrap cannot fail before it
+ * is committed, so nothing it breaks can be caught before it is pushed.
+ * @returns {string} Path to a temporary directory, the caller's to remove
+ */
 const freshClone = () => {
   const dir = mkdtempSync(join(tmpdir(), "indiekit-quickstart-"));
-  const archive = execFileSync("git", ["archive", "HEAD"]);
-  execFileSync("tar", ["-x", "-C", dir], { input: archive });
+  const tracked = execFileSync("git", ["ls-files", "-z"], { maxBuffer: 64 * 1024 * 1024 });
+  const archive = execFileSync("tar", ["-c", "--null", "-T", "-"], {
+    input: tracked,
+    maxBuffer: 512 * 1024 * 1024,
+  });
+  execFileSync("tar", ["-x", "-C", dir], { input: archive, maxBuffer: 512 * 1024 * 1024 });
   return dir;
 };
 
@@ -253,7 +264,9 @@ check("bootstrap succeeds on a fresh clone, with no .env yet to supply compose.y
 
     assert.match(output, /Wrote \.env/);
     const env = readFileSync(join(dir, ".env"), "utf8");
-    assert.match(env, /^PASSWORD_SECRET=\$2b\$/m, "PASSWORD_SECRET is not a bcrypt hash");
+    // Escaped, not raw: Compose eats a single `$`. The container-level check
+  // below proves the value survives; this one proves it is written escaped.
+  assert.match(env, /^PASSWORD_SECRET=\$\$2b\$\$/m, "PASSWORD_SECRET is not an escaped bcrypt hash");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -336,6 +349,38 @@ check("Ctrl-D after the first prompt is handled the same way everywhere: no stac
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  }
+});
+
+check("refusing and replacing .env both name what --force costs", () => {
+  // --force rewrites SECRET *and* PASSWORD_SECRET, so the password you had
+  // stops working too. Saying only that sessions are invalidated reads as
+  // "you will be signed out", not "your password changes", which is how you
+  // end up locked out of a site you thought you knew the password to.
+  const dir = freshClone();
+  try {
+    writeFileSync(`${dir}/.env`, "SECRET=existing\n");
+
+    let refusal = "";
+    try {
+      execFileSync("./bootstrap", { cwd: dir, encoding: "utf8", stdio: "pipe", env: minimalEnv() });
+    } catch (error) {
+      refusal = `${error.stdout ?? ""}${error.stderr ?? ""}`;
+    }
+
+    const replacing = execFileSync("./bootstrap", ["--force"], {
+      cwd: dir,
+      encoding: "utf8",
+      stdio: "pipe",
+      env: minimalEnv({ INDIEKIT_PASSWORD: "force-warning-1", COMPOSE_FILE: "compose.yml:compose.local.yml" }),
+    });
+
+    for (const [name, message] of [["refusal", refusal], ["--force", replacing]]) {
+      assert.match(message, /password/i, `the ${name} message does not mention the password`);
+      assert.match(message, /session|token/i, `the ${name} message does not mention sessions or tokens`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 

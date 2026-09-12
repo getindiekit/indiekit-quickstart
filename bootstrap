@@ -17,14 +17,18 @@ if (!existsSync("compose.yml")) {
   fail("Run ./bootstrap from the indiekit-quickstart repo root (no compose.yml here).");
 }
 
-const SECRET_WARNING =
-  "Regenerating SECRET invalidates every session and token already issued.";
+// Both halves matter, and only one of them is obvious. A new SECRET signs you
+// out; a new PASSWORD_SECRET means the password you had no longer opens the
+// site. Warning about sessions alone reads as "you will need to sign in
+// again", which is exactly the wrong thing to believe here.
+const REPLACE_WARNING =
+  "Replacing .env writes a new SECRET and a new password hash: every session and token already issued stops working, and the admin password becomes the one you enter now.";
 
 if (existsSync(".env")) {
   if (!force) {
-    fail(`.env already exists. Bootstrap will not overwrite it: ${SECRET_WARNING}\nPass --force to replace it.`);
+    fail(`.env already exists. Bootstrap will not overwrite it.\n${REPLACE_WARNING}\nPass --force to replace it.`);
   }
-  console.log(`--force: replacing .env. ${SECRET_WARNING}`);
+  console.log(`--force given. ${REPLACE_WARNING}`);
 }
 
 // Docker is needed to hash the password, so check before asking for anything.
