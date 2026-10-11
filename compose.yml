@@ -49,6 +49,7 @@ services:
       - ./content/notes:/site/content/notes
       - ./content/photos:/site/content/photos
       - ./content/replies:/site/content/replies
+      - ./content/pages:/site/content/pages
       - ./content/media:/site/content/media
       - ./site.json:/config/site.json:ro
       - built:/site/_site

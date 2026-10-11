@@ -8,6 +8,7 @@ content/*
 !content/notes/
 !content/photos/
 !content/replies/
+!content/pages/
 !content/media/
 content/*/*
 !content/*/.gitkeep

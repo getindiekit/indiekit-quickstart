@@ -71,7 +71,7 @@ check("compose config resolves with the example env", () => {
   // The theme's content/ is its Eleventy source as well as the store, so the
   // site container must mount the store one post directory at a time, never
   // the whole directory (that would hide the theme's templates).
-  for (const dir of ["articles", "bookmarks", "likes", "notes", "photos", "replies", "media"]) {
+  for (const dir of ["articles", "bookmarks", "likes", "notes", "photos", "replies", "pages", "media"]) {
     assert.ok(out.includes(`target: /site/content/${dir}`), `site does not mount ./content/${dir}`);
     assert.ok(existsSync(`content/${dir}/.gitkeep`), `content/${dir}/.gitkeep missing: the bind mount would be created root-owned`);
   }

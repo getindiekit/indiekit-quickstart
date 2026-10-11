@@ -72,8 +72,9 @@ docker compose up -d --build
 ## Where things live
 
 - `content/` is yours: one directory per post type (`articles`, `bookmarks`,
-  `likes`, `notes`, `photos`, `replies`) and `media` for uploads. Indiekit
-  writes there; the site is built from there. Back it up.
+  `likes`, `notes`, `photos`, `replies`), `pages` for `/about`-style pages,
+  and `media` for uploads. Indiekit writes there; the site is built from
+  there. Back it up.
 - `site/` is the theme (a git submodule). Customise your site through
   `site.json` here, or through the theme's own `_data/site.json` keys — see
   the [theme README](https://github.com/getindiekit/indiekit-theme-eleventy#readme)

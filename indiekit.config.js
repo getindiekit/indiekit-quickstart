@@ -7,7 +7,7 @@ if (existsSync(".env")) {
 }
 
 // One post type per directory the theme renders. Paths omit the date because
-// the theme's permalinks are /<type>/<slug>/ (content/*/*.11tydata.js); the
+// the theme's permalinks are /<type>/<slug>/ (content/content.11tydata.js); the
 // preset's default path would put the date in the file name and the URL.
 const postType = (collection) => ({
 	post: { path: `${collection}/{slug}.md`, url: `${collection}/{slug}` },
@@ -18,7 +18,7 @@ const postType = (collection) => ({
 // Indiekit install that mounts this file; the theme itself installs no
 // Indiekit package.
 export default {
-	plugins: ["@indiekit/preset-eleventy", "@indiekit/store-file-system"],
+	plugins: ["@indiekit/preset-eleventy", "@indiekit/post-type-page", "@indiekit/store-file-system"],
 	publication: {
 		me: process.env.PUBLICATION_URL,
 		postTypes: {
@@ -28,6 +28,14 @@ export default {
 			note: postType("notes"),
 			photo: postType("photos"),
 			reply: postType("replies"),
+			// A page (/about, /now) is dateless and lives at the root of the site.
+			// The file still goes in a directory of its own: the content root is
+			// the theme's source, and a deployment mounts the store one directory
+			// at a time. Only the URL is the bare slug.
+			page: {
+				post: { path: "pages/{slug}.md", url: "{slug}" },
+				media: { path: "media/pages/{filename}", url: "media/pages/{filename}" },
+			},
 		},
 	},
 	"@indiekit/store-file-system": { directory: "./content" },
