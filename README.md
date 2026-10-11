@@ -172,6 +172,9 @@ have created fails that build with a message naming it, so the menu can
 never hold a dead link; the build log also names any page that exists but is
 not listed.
 
+Every page you have created is listed at `SITE_URL/pages/`, in the menu or
+not, and the Collections page links there with the count.
+
 ## Images
 
 The stack runs four images. Two are stock, two are Indiekit's:
