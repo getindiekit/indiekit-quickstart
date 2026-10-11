@@ -1,6 +1,7 @@
 {
   "name": "My site",
   "description": "An IndieWeb site, published with Indiekit.",
+  "navigation": [],
   "timezone": "UTC",
   "author": {
     "name": "",

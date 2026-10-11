@@ -14,7 +14,7 @@ export SITE_FIXTURE="/config/site.json,/tmp/site.url.json"
 if [ "${DEMO:-0}" = "1" ]; then
 	# File by file: busybox cp -n given a directory skips it whole once the
 	# destination directory exists, which every store directory does.
-	for d in articles bookmarks likes notes photos replies media; do
+	for d in articles bookmarks likes notes photos replies pages media; do
 		for f in "/site/.demo/$d"/*; do
 			[ -e "$f" ] || continue
 			[ -e "/site/content/$d/${f##*/}" ] || cp -a "$f" "/site/content/$d/"

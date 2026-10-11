@@ -156,6 +156,22 @@ looks "already edited", `bootstrap` declines to write identity, and the site
 publishes with no h-card — silently. Change `site.json` and `site.example.json`
 together, or not at all.
 
+## Pages and the menu
+
+Indiekit's *page* post type is for `/about`, `/now`, `/uses`: create one
+from the editor and it is served at `/<slug>/`. Creating a page does not put
+it in the menu, and a page can stay out of the menu on purpose. To list
+pages in the rail, name their paths in `site.json`, in the order you want:
+
+```json
+"navigation": ["/about/", "/now/"]
+```
+
+The site rebuilds on its own after you save. A path that is not a page you
+have created fails that build with a message naming it, so the menu can
+never hold a dead link; the build log also names any page that exists but is
+not listed.
+
 ## Images
 
 The stack runs four images. Two are stock, two are Indiekit's:
