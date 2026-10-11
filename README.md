@@ -71,9 +71,10 @@ docker compose up -d --build
 
 ## Where things live
 
-- `content/` is yours: one directory per post type (`articles`, `bookmarks`,
-  `likes`, `notes`, `photos`, `replies`), `pages` for `/about`-style pages,
-  and `media` for uploads. Indiekit writes there; the site is built from
+- `content/` is yours: one directory per post type (`articles`, `notes`,
+  `photos`, `bookmarks`, `likes`, `replies`, `reposts`, `rsvps`, `events`,
+  `jams`, `audio`, `videos`), `pages` for `/about`-style pages, and `media`
+  for uploads. Indiekit writes there; the site is built from
   there. Back it up.
 - `site/` is the theme (a git submodule). Customise your site through
   `site.json` here, or through the theme's own `_data/site.json` keys — see
@@ -155,6 +156,14 @@ file to edit. If it drifts from the shipped `site.json`, every fresh clone
 looks "already edited", `bootstrap` declines to write identity, and the site
 publishes with no h-card — silently. Change `site.json` and `site.example.json`
 together, or not at all.
+
+## What is loaded
+
+All of native Indiekit that works with a file store and the Eleventy preset:
+every post type (article, note, photo, bookmark, like, reply, repost, RSVP,
+event, jam, audio, video, page), every default endpoint, plus Microsub and
+webmention.io. The three syndicators (Bluesky, Mastodon, Internet Archive)
+switch on when their credentials are set in `.env`; see `.env.example`.
 
 ## Pages and the menu
 

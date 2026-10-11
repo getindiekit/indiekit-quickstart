@@ -9,6 +9,12 @@ content/*
 !content/photos/
 !content/replies/
 !content/pages/
+!content/audio/
+!content/events/
+!content/jams/
+!content/reposts/
+!content/rsvps/
+!content/videos/
 !content/media/
 content/*/*
 !content/*/.gitkeep

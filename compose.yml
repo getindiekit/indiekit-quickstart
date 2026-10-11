@@ -11,6 +11,16 @@ services:
       MONGO_URL: mongodb://mongo:27017/indiekit
       SECRET: ${SECRET}
       PASSWORD_SECRET: ${PASSWORD_SECRET:-}
+      # Optional. Each syndicator loads only when its credentials are set
+      # (indiekit.config.js); webmention.io sync needs its token.
+      WEBMENTION_IO_TOKEN: ${WEBMENTION_IO_TOKEN:-}
+      BLUESKY_HANDLE: ${BLUESKY_HANDLE:-}
+      BLUESKY_PASSWORD: ${BLUESKY_PASSWORD:-}
+      MASTODON_URL: ${MASTODON_URL:-}
+      MASTODON_USER: ${MASTODON_USER:-}
+      MASTODON_ACCESS_TOKEN: ${MASTODON_ACCESS_TOKEN:-}
+      INTERNET_ARCHIVE_ACCESS_KEY: ${INTERNET_ARCHIVE_ACCESS_KEY:-}
+      INTERNET_ARCHIVE_SECRET_KEY: ${INTERNET_ARCHIVE_SECRET_KEY:-}
     # Sign-in makes the server fetch its own public address. From inside the
     # container that address must reach this machine's Caddy, not the
     # container itself (localhost) and not depend on the network hairpinning
@@ -50,6 +60,12 @@ services:
       - ./content/photos:/site/content/photos
       - ./content/replies:/site/content/replies
       - ./content/pages:/site/content/pages
+      - ./content/audio:/site/content/audio
+      - ./content/events:/site/content/events
+      - ./content/jams:/site/content/jams
+      - ./content/reposts:/site/content/reposts
+      - ./content/rsvps:/site/content/rsvps
+      - ./content/videos:/site/content/videos
       - ./content/media:/site/content/media
       - ./site.json:/config/site.json:ro
       - built:/site/_site

@@ -36,7 +36,7 @@
 	# dropped when the address scheme is http; nothing else in Indiekit reads it.
 	# Over HTTPS it is passed through and the redirect never fires.
 	@indiekit_plain {
-		path /micropub* /auth* /media* /files* /image* /posts* /share* /syndicate* /webmentions* /session* /status* /assets* /id /plugins* /feed.jf2 /app.webmanifest /serviceworker.js /offline /.well-known/oauth-authorization-server
+		path /micropub* /auth* /media* /files* /image* /posts* /share* /syndicate* /webmentions* /microsub* /session* /status* /assets* /id /plugins* /feed.jf2 /app.webmanifest /serviceworker.js /offline /.well-known/oauth-authorization-server
 		expression {scheme} == "http"
 	}
 	handle @indiekit_plain {
@@ -44,7 +44,7 @@
 			header_up -X-Forwarded-Proto
 		}
 	}
-	@indiekit path /micropub* /auth* /media* /files* /image* /posts* /share* /syndicate* /webmentions* /session* /status* /assets* /id /plugins* /feed.jf2 /app.webmanifest /serviceworker.js /offline /.well-known/oauth-authorization-server
+	@indiekit path /micropub* /auth* /media* /files* /image* /posts* /share* /syndicate* /webmentions* /microsub* /session* /status* /assets* /id /plugins* /feed.jf2 /app.webmanifest /serviceworker.js /offline /.well-known/oauth-authorization-server
 	handle @indiekit {
 		reverse_proxy indiekit:3000
 	}

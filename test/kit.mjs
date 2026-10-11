@@ -71,7 +71,7 @@ check("compose config resolves with the example env", () => {
   // The theme's content/ is its Eleventy source as well as the store, so the
   // site container must mount the store one post directory at a time, never
   // the whole directory (that would hide the theme's templates).
-  for (const dir of ["articles", "bookmarks", "likes", "notes", "photos", "replies", "pages", "media"]) {
+  for (const dir of ["articles", "bookmarks", "likes", "notes", "photos", "replies", "pages", "audio", "events", "jams", "reposts", "rsvps", "videos", "media"]) {
     assert.ok(out.includes(`target: /site/content/${dir}`), `site does not mount ./content/${dir}`);
     assert.ok(existsSync(`content/${dir}/.gitkeep`), `content/${dir}/.gitkeep missing: the bind mount would be created root-owned`);
   }
@@ -81,7 +81,7 @@ check("compose config resolves with the example env", () => {
 check("Caddyfile serves uploads before proxying the media endpoint, and covers Indiekit's paths", () => {
   const caddy = readFileSync("Caddyfile", "utf8");
   assert.ok(caddy.indexOf("handle @upload") < caddy.indexOf("handle @site_media") && caddy.indexOf("handle @site_media") < caddy.indexOf("reverse_proxy indiekit:3000"), "uploads, then the built site's media, must come before the proxy");
-  for (const p of ["/micropub*", "/auth*", "/media*", "/files*", "/image*", "/posts*", "/share*", "/syndicate*", "/webmentions*", "/session*", "/status*", "/assets*", "/id", "/plugins*", "/app.webmanifest", "/serviceworker.js", "/offline", "/.well-known/oauth-authorization-server"]) {
+  for (const p of ["/micropub*", "/auth*", "/media*", "/files*", "/image*", "/posts*", "/share*", "/syndicate*", "/webmentions*", "/microsub*", "/session*", "/status*", "/assets*", "/id", "/plugins*", "/app.webmanifest", "/serviceworker.js", "/offline", "/.well-known/oauth-authorization-server"]) {
     assert.ok(caddy.includes(p), `Caddyfile does not route ${p}`);
   }
 });
@@ -127,7 +127,12 @@ check("renderEnv fills every key and leaves the comments", () => {
   assert.match(out, /^PASSWORD_SECRET=\$2b\$10\$hash$/m);
   assert.match(out, /^UID_GID=1000:1000$/m);
   assert.ok(out.includes("# The one address everything is served from"), "comments were dropped");
-  assert.equal(/^[A-Z_]+=$/m.test(out), false, "a key was left empty");
+  // Keys bootstrap fills must be filled; keys that are empty in the template
+  // and not bootstrap's to fill (the optional credentials) may stay empty.
+  const values = ["SITE_URL", "SITE_HOST", "SECRET", "PASSWORD_SECRET", "UID_GID"];
+  const emptyBefore = new Set([...template.matchAll(/^([A-Z_]+)=$/gm)].map((m) => m[1]));
+  const leftEmpty = [...out.matchAll(/^([A-Z_]+)=$/gm)].map((m) => m[1]).filter((k) => values.includes(k) || !emptyBefore.has(k));
+  assert.deepEqual(leftEmpty, [], "a key bootstrap fills was left empty");
 });
 
 check("renderEnv writes values containing $ literally", () => {
