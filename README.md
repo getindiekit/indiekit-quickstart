@@ -164,6 +164,8 @@ every post type (article, note, photo, bookmark, like, reply, repost, RSVP,
 event, jam, audio, video, page), every default endpoint, plus Microsub and
 webmention.io. The three syndicators (Bluesky, Mastodon, Internet Archive)
 switch on when their credentials are set in `.env`; see `.env.example`.
+`INDIEKIT_LOCALE=en` there pins the admin interface's language; empty, it
+follows your browser.
 
 ## Pages and the menu
 

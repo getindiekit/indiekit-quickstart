@@ -53,6 +53,10 @@ export default {
 		...(mastodon ? ["@indiekit/syndicator-mastodon"] : []),
 		...(internetArchive ? ["@indiekit/syndicator-internet-archive"] : []),
 	],
+	// INDIEKIT_LOCALE pins the admin interface's language (en, fr, de, …).
+	// Unset, Indiekit follows the browser's Accept-Language, which is what a
+	// multilingual author wants and what a screenshot session does not.
+	...(env.INDIEKIT_LOCALE && { application: { locale: env.INDIEKIT_LOCALE } }),
 	publication: {
 		me: process.env.PUBLICATION_URL,
 		postTypes: {

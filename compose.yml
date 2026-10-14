@@ -13,6 +13,7 @@ services:
       PASSWORD_SECRET: ${PASSWORD_SECRET:-}
       # Optional. Each syndicator loads only when its credentials are set
       # (indiekit.config.js); webmention.io sync needs its token.
+      INDIEKIT_LOCALE: ${INDIEKIT_LOCALE:-}
       WEBMENTION_IO_TOKEN: ${WEBMENTION_IO_TOKEN:-}
       BLUESKY_HANDLE: ${BLUESKY_HANDLE:-}
       BLUESKY_PASSWORD: ${BLUESKY_PASSWORD:-}
