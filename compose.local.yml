@@ -1,5 +1,5 @@
 # Before ghcr.io/getindiekit/indiekit is published, or to test a local build of it:
-#   docker build -t indiekit:local /path/to/getindiekit/indiekit
+#   docker build -f /path/to/getindiekit/indiekit/docker/Dockerfile -t indiekit:local /path/to/getindiekit/indiekit
 #   docker compose -f compose.yml -f compose.local.yml up -d
 services:
   indiekit:

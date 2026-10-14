@@ -49,7 +49,7 @@ published — or to test a local build of it — build the image yourself and
 point the stack at it with the local override:
 
 ```sh
-docker build -t indiekit:local /path/to/getindiekit/indiekit
+docker build -f /path/to/getindiekit/indiekit/docker/Dockerfile -t indiekit:local /path/to/getindiekit/indiekit
 docker compose -f compose.yml -f compose.local.yml up -d
 ```
 
